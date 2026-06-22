@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGS School - Parent Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f9f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #16a085; border-bottom: 2px solid #1abc9c; padding-bottom: 10px; }
+        .dashboard-section { background: #ffffff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border-left: 5px solid #16a085;}
+        h2 { color: #2c3e50; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;}
+        select, input[type="text"], textarea { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
+        button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; transition: 0.2s; background-color: #16a085;}
+        button:hover { background-color: #12876f; transform: translateY(-1px); }
+        button:disabled { background: #ccc !important; cursor: not-allowed; }
+        .btn-blue { background-color: #2980b9; } .btn-blue:hover { background-color: #1f618d; }
+        
+        .output-box { background: #f8f9fa; border: 1px solid #e1e8ed; padding: 20px; border-radius: 4px; margin-top: 15px; font-size: 15px; line-height: 1.6; }
+        .loading-spinner { color: #16a085; font-style: italic; margin: 15px 0; padding: 10px; background: #e8f8f5; border-left: 4px solid #16a085;}
+        .error-text { color: #c0392b; font-weight: bold; }
+        
+        .analytics-container { display: flex; gap: 20px; margin-top: 20px; align-items: flex-start;}
+        .chart-container { flex: 2; width: 100%; max-width: 500px;}
+        .report-box { flex: 1; font-size: 14px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>👨‍👩‍👦 Parent AI Dashboard</h1>
+
+    <div class="dashboard-section">
+        <h2>📅 Assignment Tracker Report</h2>
+        <button id="task-btn" onclick="loadAssignments()">Generate Assignment Update</button>
+        <div id="task-loading" class="loading-spinner" style="display: none;">Checking your child's planner...</div>
+        <div id="task-workspace" class="output-box" style="display: none;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📈 Academic Progress Report</h2> 
+        <div class="controls">
+            <select id="perf-scope" onchange="toggleSubjectInput()">
+                <option value="all">All Subjects Overall</option>
+                <option value="single">Specific Subject</option>
+            </select>
+            <input type="text" id="perf-subject" placeholder="e.g., Math" style="display: none;">
+            <button id="perf-btn" onclick="loadAnalytics()">Generate Progress Report</button> 
+        </div>
+        
+        <div id="perf-loading" class="loading-spinner" style="display: none;">Analyzing test scores...</div>
+        <div id="perf-workspace" class="analytics-container" style="display: none;">
+            <div class="chart-container"><canvas id="perfChart"></canvas></div>
+            <div id="perf-report" class="output-box report-box"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>🌍 School Communication Tools</h2>
+        <p>Translate school notices or use text-to-speech to listen to them.</p>
+        
+        <textarea id="comm-text" rows="4" style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;" placeholder="Paste an email, report card note, or assignment details here..."></textarea>
+        
+        <div class="controls">
+            <select id="lang-select">
+                <option value="Hindi">Hindi</option>
+                <option value="Telugu">Telugu</option>
+                <option value="Oriya">Oriya</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Sanskrit">Sanskrit</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Kannada">Kannada</option>
+                <option value="Koya">Tribal - Koya</option>
+                <option value="Gondi">Tribal - Gondi</option>
+                <option value="Konda">Tribal - Konda</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+            </select>
+            <button id="trans-btn" onclick="translateText()">Translate Text</button>
+            <button onclick="speakText()" class="btn-blue">🔊 Listen (Read Aloud)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:5000/api/v1/ai/parent";
+
+    // Mock Parent Profile for DB Logging
+    const activeUser = { name: "Parent Ravi", email: "ravi@sgs.edu", role: "Parent" };
+
+    // Custom Fetch wrapper to inject User Data
+    async function fetchWithLog(endpoint, payload) {
+        const bodyData = { ...payload, userInfo: activeUser };
+        const res = await fetch(`${API_BASE}${endpoint}`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(bodyData) 
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Request failed.");
+        return data;
+    }
+
+    // 1. Assignment Report
+    async function loadAssignments() {
+        const btn = document.getElementById('task-btn');
+        const loading = document.getElementById('task-loading');
+        const ws = document.getElementById('task-workspace');
+        
+        btn.disabled = true; ws.style.display = 'none'; loading.style.display = 'block';
+        try {
+            const data = await fetchWithLog('/assignments', {});
+            ws.innerHTML = `<strong>AI Assistant Note:</strong><br>${marked.parse(data.report)}`;
+        } catch(err) { ws.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
+        finally { loading.style.display = 'none'; ws.style.display = 'block'; btn.disabled = false; }
+    }
+
+    function toggleSubjectInput() {
+        const scope = document.getElementById('perf-scope').value;
+        document.getElementById('perf-subject').style.display = scope === 'single' ? 'inline-block' : 'none';
+    }
+
+    // 2 & 3. Performance Analytics
+    let chartInstance = null;
+    async function loadAnalytics() {
+        const btn = document.getElementById('perf-btn');
+        const loading = document.getElementById('perf-loading');
+        const ws = document.getElementById('perf-workspace');
+        const scope = document.getElementById('perf-scope').value;
+        const subject = document.getElementById('perf-subject').value;
+        
+        btn.disabled = true; ws.style.display = 'none'; loading.style.display = 'block';
+        try {
+            const data = await fetchWithLog('/analytics', { scope, subject });
+            document.getElementById('perf-report').innerHTML = `<strong>Counselor Notes:</strong><br>${marked.parse(data.analysis)}`;
+            
+            if(data.chartData && Array.isArray(data.chartData)) {
+                const ctx = document.getElementById('perfChart').getContext('2d');
+                if(chartInstance) chartInstance.destroy();
+                
+                if (scope === 'all') {
+                    chartInstance = new Chart(ctx, { 
+                        type: 'bar', 
+                        data: { 
+                            labels: data.chartData.map(g => g.subject), 
+                            datasets: [{ label: 'Score', data: data.chartData.map(g => g.score), backgroundColor: '#16a085' }] 
+                        } 
+                    });
+                } else {
+                    chartInstance = new Chart(ctx, { 
+                        type: 'line', 
+                        data: { 
+                            labels: data.chartData.map(g => g.test_name), 
+                            datasets: [{ label: `${subject} Scores`, data: data.chartData.map(g => g.score), borderColor: '#2980b9' }] 
+                        } 
+                    });
+                }
+            }
+            ws.style.display = 'flex';
+        } catch(err) { document.getElementById('perf-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; ws.style.display = 'flex'; }
+        finally { loading.style.display = 'none'; btn.disabled = false; }
+    }
+
+    // 4 & 5. Translate & Voice
+    async function translateText() {
+        const text = document.getElementById('comm-text').value;
+        const lang = document.getElementById('lang-select').value;
+        const btn = document.getElementById('trans-btn');
+        if(!text) return;
+        
+        btn.disabled = true; btn.innerText = "Translating...";
+        try {
+            const data = await fetchWithLog('/translate', { text: text, targetLanguage: lang });
+            document.getElementById('comm-text').value = data.translation;
+        } catch(err) { alert("Translation error: " + err.message); }
+        finally { btn.disabled = false; btn.innerText = "Translate Text"; }
+    }
+
+    function speakText() {
+        const text = document.getElementById('comm-text').value;
+        if (!text) return;
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+</script>
+</body>
+</html>

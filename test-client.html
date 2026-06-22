@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGS School - Student AI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #34495e; padding-bottom: 10px; }
+        .dashboard-section { background: #ffffff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        h2 { color: #2980b9; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        
+        /* Buttons & Inputs */
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:disabled { background: #ccc !important; cursor: not-allowed; transform: none; }
+        select, input[type="text"] { padding: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
+        
+        .btn-small { background-color: #9b59b6; }
+        .btn-average { background-color: #f39c12; }
+        .btn-quick { background-color: #e74c3c; }
+        .btn-analytics { background-color: #2ecc71; }
+        .btn-quiz { background-color: #3498db; }
+        
+        /* Chat UI */
+        #chat-feed { height: 350px; overflow-y: auto; background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;}
+        .chat-msg { max-width: 85%; line-height: 1.5; padding: 10px; border-radius: 8px; position: relative;}
+        .user-msg { background: #3498db; color: #fff; align-self: flex-end; border-bottom-right-radius: 0; }
+        .ai-msg { background: #eee; color: #333; align-self: flex-start; border-bottom-left-radius: 0; }
+        .listen-btn { cursor: pointer; background: #2c3e50; border: none; font-size: 12px; font-weight: bold; padding: 5px 10px; color: white; border-radius: 4px; margin-top: 8px; display: inline-block;}
+        .listen-btn:hover { background: #1a252f; transform: translateY(-1px);}
+        .mic-btn { border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background-color: #e74c3c;}
+
+        /* General Output */
+        .output-box { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; border-radius: 0 4px 4px 0; margin-top: 15px; font-size: 15px; line-height: 1.6; }
+        .error-text { color: #c0392b; font-weight: bold; }
+        .loading-spinner { color: #7f8c8d; font-style: italic; margin: 15px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; }
+
+        /* Quiz & Analytics */
+        .quiz-card { background: #fff; border: 1px solid #e1e8ed; border-radius: 8px; padding: 20px; margin-bottom: 15px; }
+        .quiz-option { display: block; margin: 10px 0; padding: 10px; background: #f8f9fa; border: 1px solid #e1e8ed; border-radius: 6px; cursor: pointer; }
+        .feedback { margin-top: 10px; padding: 10px; border-radius: 4px; display: none; }
+        .analytics-container { display: flex; gap: 20px; margin-top: 20px; }
+        .chart-container { flex: 2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎓 Student AI Learning Dashboard</h1>
+
+    <div class="dashboard-section">
+        <h2>📖 AI Paced Learning</h2>
+        <div class="btn-group">
+            <button class="btn-small" onclick="generateContent('small')">Small Pace</button>
+            <button class="btn-average" onclick="generateContent('average')">Average Pace</button>
+            <button class="btn-quick" onclick="generateContent('quick')">Quick Pace</button>
+        </div>
+        <div id="content-loading" class="loading-spinner" style="display: none;">✍️ Gemini is rewriting the chapter...</div>
+        <div id="paced-content-workspace" class="output-box" style="display: none;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📝 AI Practice Quiz</h2>
+        <button class="btn-quiz" id="quiz-btn" onclick="triggerQuizGeneration()">Generate Practice Quiz</button>
+        <div id="quiz-loading" class="loading-spinner" style="display: none;">⚙️ Crafting your questions...</div>
+        <div id="quiz-container"></div>
+        <div id="quiz-summary" class="output-box" style="display:none; background-color: #e8f8f5; border-color: #2ecc71;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📊 Performance Analytics</h2>
+        <button class="btn-analytics" id="analytics-btn" onclick="loadAnalytics()">Generate Self-Assessment Report</button>
+        <div id="analytics-loading" class="loading-spinner" style="display: none;">📊 Crunching your metrics...</div>
+        <div id="analytics-workspace" style="display: none;" class="analytics-container">
+            <div class="chart-container"><canvas id="performanceChart"></canvas></div>
+            <div id="ai-report-text" class="output-box"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>💬 🎙️ AI Multilingual Tutor</h2>
+        <div id="chat-feed">
+            <div class="chat-msg ai-msg">Hi there! I am your AI Tutor. You can talk to me or type, and select your default preferred language below!</div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button id="dictate-btn" class="mic-btn" onclick="toggleDictation()" title="Click to Speak">🎙️</button>
+            
+            <input type="text" id="chat-input" style="flex: 1;" placeholder="Ask me anything...">
+            
+            <select id="chat-lang" style="font-weight: bold;" title="Your Default Profile Language">
+                <option value="English">English</option>
+                <option value="Telugu">Telugu</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Oriya">Oriya</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Sanskrit">Sanskrit</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Kannada">Kannada</option>
+                <option value="Koya">Tribal - Koya</option>
+                <option value="Gondi">Tribal - Gondi</option>
+                <option value="Konda">Tribal - Konda</option>
+                <option value="French">French</option>
+                <option value="Spanish">Spanish</option>
+            </select>
+            
+            <button class="btn-quiz" id="chat-btn" onclick="sendChatMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:5000/api/v1/ai/tutoring";
+
+    const activeUser = { name: "Student Priya", email: "priya@sgs.edu", role: "Student" };
+
+    async function fetchWithLog(endpoint, payload) {
+        const bodyData = { ...payload, userInfo: activeUser };
+        const res = await fetch(`${API_BASE}${endpoint}`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(bodyData) 
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Request failed.");
+        return data;
+    }
+
+    // Paced Content
+    async function generateContent(pace) {
+        const workspace = document.getElementById('paced-content-workspace');
+        const loading = document.getElementById('content-loading');
+        workspace.style.display = 'none'; loading.style.display = 'block';
+
+        try {
+            const data = await fetchWithLog('/generate-content', { chapterId: 1, pace });
+            workspace.innerHTML = marked.parse(`**Your ${pace.toUpperCase()} track content:**\n\n${data.generatedContent}`);
+            if (window.MathJax) MathJax.typesetPromise();
+        } catch (err) {
+            workspace.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
+        } finally { loading.style.display = 'none'; workspace.style.display = 'block'; }
+    }
+
+    // Quiz Generator & Grading
+    let currentQuiz = [];
+    async function triggerQuizGeneration() {
+        const btn = document.getElementById('quiz-btn');
+        const loading = document.getElementById('quiz-loading');
+        const container = document.getElementById('quiz-container');
+        const summary = document.getElementById('quiz-summary');
+        
+        btn.disabled = true; container.innerHTML = ''; summary.style.display = 'none'; loading.style.display = 'block';
+
+        try {
+            const data = await fetchWithLog('/generate-quiz', { chapterId: 1 });
+            currentQuiz = data.quiz;
+            let html = '';
+            currentQuiz.forEach((q, i) => {
+                html += `<div class="quiz-card"><h4>${q.question}</h4>${q.options.map(o => `<label class="quiz-option"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`).join('')}<div id="f${i}" class="feedback"></div></div>`;
+            });
+            container.innerHTML = html + `<button class="btn-analytics" onclick="grade()" style="width:100%">Submit Answers</button>`;
+            if (window.MathJax) MathJax.typesetPromise();
+        } catch (err) {
+            container.innerHTML = `<div class="output-box error-text">🚨 ${err.message}</div>`;
+        } finally { btn.disabled = false; loading.style.display = 'none'; }
+    }
+
+    function grade() {
+        let correctCount = 0;
+        let totalCount = currentQuiz.length;
+
+        currentQuiz.forEach((q, i) => {
+            const selected = document.querySelector(`input[name="q${i}"]:checked`);
+            const f = document.getElementById(`f${i}`);
+            f.style.display = 'block';
+            
+            if (selected && selected.value === q.answer) {
+                f.style.background = '#d4edda'; 
+                correctCount++;
+            } else { f.style.background = '#f8d7da'; }
+            f.innerHTML = `<strong>Correct Answer:</strong> ${q.answer}<br><em>${q.explanation}</em>`;
+        });
+
+        const summaryDiv = document.getElementById('quiz-summary');
+        summaryDiv.style.display = 'block';
+        summaryDiv.innerHTML = `<h3 style="margin-top:0; color:#27ae60;">🎯 Quiz Complete!</h3><p style="font-size: 18px;">You scored <strong>${correctCount} out of ${totalCount}</strong>.</p><p style="margin-bottom:0;">Review your answers above to see detailed explanations from the AI Tutor.</p>`;
+    }
+
+    // Analytics
+    let chartInstance = null;
+    async function loadAnalytics() {
+        const btn = document.getElementById('analytics-btn');
+        const loading = document.getElementById('analytics-loading');
+        const workspace = document.getElementById('analytics-workspace');
+        const aiText = document.getElementById('ai-report-text');
+        
+        btn.disabled = true; workspace.style.display = 'none'; loading.style.display = 'block';
+
+        try {
+            const data = await fetchWithLog('/analytics', {});
+            aiText.innerHTML = marked.parse(data.aiReportCard);
+            workspace.style.display = 'flex';
+            
+            const mathData = data.chartData.filter(g => g.subject === 'Math');
+            const scienceData = data.chartData.filter(g => g.subject === 'Science');
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            if(chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, { 
+                type: 'line', 
+                data: { 
+                    labels: mathData.map(g => g.test_name), 
+                    datasets: [ 
+                        { label: 'Math', data: mathData.map(g => g.score), borderColor: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.2)', borderWidth: 2 }, 
+                        { label: 'Science', data: scienceData.map(g => g.score), borderColor: '#2ecc71', backgroundColor: 'rgba(46, 204, 113, 0.2)', borderWidth: 2 } 
+                    ] 
+                }, 
+                options: { scales: { y: { min: 0, max: 100 } } } 
+            });
+        } catch (err) {
+            workspace.style.display = 'flex'; aiText.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; document.querySelector('.chart-container').style.display = 'none';
+        } finally { btn.disabled = false; loading.style.display = 'none'; }
+    }
+
+    // --- VOICE & MULTILINGUAL CHATBOT ---
+
+    let recognition;
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.onresult = (e) => { 
+            document.getElementById('chat-input').value += e.results[0][0].transcript + " "; 
+            document.getElementById('dictate-btn').innerText = "🎙️"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#e74c3c";
+        };
+    }
+    function toggleDictation() { 
+        if(recognition){ 
+            document.getElementById('dictate-btn').innerText = "🔴"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#2ecc71"; 
+            recognition.start(); 
+        } else { alert("Speech recognition is not supported in this browser."); }
+    }
+
+    // UPGRADED TEXT-TO-SPEECH (With Hardware Voice Checking)
+    function speakChat(btnElement) { 
+        window.speechSynthesis.cancel(); 
+        
+        const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        
+        const selectedLang = document.getElementById('chat-lang').value;
+        
+        const languageCodes = {
+            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
+            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" // Tribal fallback
+        };
+
+        const targetLangCode = languageCodes[selectedLang] || "en-US";
+        utterance.lang = targetLangCode;
+
+        // CHECK: Does the user's computer actually have this voice installed?
+        const availableVoices = window.speechSynthesis.getVoices();
+        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
+
+        if (!voiceFound && targetLangCode !== "en-US") {
+            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed! Please add it in your device's Language Settings to hear this message.`);
+        } else if (voiceFound) {
+            utterance.voice = voiceFound;
+        }
+
+        window.speechSynthesis.speak(utterance); 
+    }
+
+    // Help Chrome load voices smoothly
+    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+
+    async function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const feed = document.getElementById('chat-feed');
+        const btn = document.getElementById('chat-btn');
+        const targetLang = document.getElementById('chat-lang').value;
+        const msg = input.value.trim(); 
+        
+        if (!msg) return;
+        
+        feed.innerHTML += `<div class="chat-msg user-msg">${msg}</div>`;
+        input.value = ''; btn.disabled = true; feed.scrollTop = feed.scrollHeight;
+        
+        try {
+            const data = await fetchWithLog('/chat', { message: msg, targetLanguage: targetLang });
+            
+            const rawAiText = data.reply || "I'm sorry, I encountered an error processing that."; 
+            const formattedHTML = marked.parse(rawAiText);
+            
+            feed.innerHTML += `
+                <div class="chat-msg ai-msg">
+                    <div class="msg-text">${formattedHTML}</div>
+                    <button class="listen-btn" onclick="speakChat(this)" title="Listen to this message">🔊 Listen</button>
+                </div>`;
+                
+            if (window.MathJax) MathJax.typesetPromise(); 
+        } catch (err) {
+            feed.innerHTML += `<div class="chat-msg ai-msg"><span class="error-text">🚨 Server Error: ${err.message}</span></div>`;
+        } finally { btn.disabled = false; feed.scrollTop = feed.scrollHeight; }
+    }
+
+    document.getElementById('chat-input').addEventListener("keypress", function(event) {
+      if (event.key === "Enter") { event.preventDefault(); sendChatMessage(); }
+    });
+</script>
+</body>
+</html>

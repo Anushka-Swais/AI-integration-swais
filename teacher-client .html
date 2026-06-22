@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGS School - Teacher AI Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #8e44ad; border-bottom: 2px solid #9b59b6; padding-bottom: 10px; }
+        .dashboard-section { background: #ffffff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border-left: 5px solid #8e44ad;}
+        h2 { color: #2c3e50; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .controls { display: flex; gap: 15px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;}
+        select, input[type="text"], input[type="number"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
+        button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; background-color: #8e44ad; transition: 0.2s;}
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; }
+        .btn-green { background-color: #27ae60; } .btn-blue { background-color: #2980b9; } .btn-red { background-color: #e74c3c; }
+        .output-box { background: #f8f9fa; border: 1px solid #e1e8ed; padding: 20px; border-radius: 4px; margin-top: 15px; font-size: 15px; line-height: 1.6; overflow-x: auto; }
+        .loading-spinner { color: #8e44ad; font-style: italic; margin: 15px 0; padding: 10px; background: #f5eef8; border-left: 4px solid #8e44ad; }
+        .analytics-container { display: flex; gap: 20px; margin-top: 20px; align-items: flex-start;}
+        .chart-container { flex: 2; min-width: 300px;}
+        .report-box { flex: 1; font-size: 14px; }
+        .error-text { color: #c0392b; font-weight: bold; }
+        
+        .chat-box { height: 350px; overflow-y: auto; background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;}
+        .chat-msg { padding: 12px 16px; border-radius: 18px; max-width: 85%; line-height: 1.4; position: relative;}
+        .user-msg { background: #8e44ad; color: white; align-self: flex-end; border-bottom-right-radius: 4px;}
+        .ai-msg { background: #ecf0f1; color: #2c3e50; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #dfe6e9;}
+        .listen-btn { cursor: pointer; background: #2c3e50; border: none; font-size: 12px; font-weight: bold; padding: 5px 10px; color: white; border-radius: 4px; margin-top: 8px; display: inline-block;}
+        .listen-btn:hover { background: #1a252f; transform: translateY(-1px);}
+        .mic-btn { border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 20px;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>👩‍🏫 Teacher AI Planning Portal</h1>
+
+    <div class="dashboard-section">
+        <h2>📑 Core Teacher Tools</h2>
+        <div class="controls">
+            <button onclick="generateLessonPlan()">Generate Lesson Plan</button>
+            
+            <div style="display:flex; align-items:center; gap:5px;">
+                <input type="number" id="exam-marks" value="20" placeholder="Total Marks" style="width: 80px;" title="Total Marks for the Exam">
+                <button onclick="generateQuestionPaper()">Generate Exam Paper</button>
+            </div>
+
+            <button onclick="correctAnswer()">Grade Sample Answer</button>
+        </div>
+        <div id="core-loading" class="loading-spinner" style="display:none;">Processing request with AI...</div>
+        <div id="core-ws" class="output-box" style="display:none;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📅 Assignment Reminders</h2>
+        <button onclick="generateReminders()">Draft Reminders for Missing Work</button>
+        <div id="rem-loading" class="loading-spinner" style="display:none;">Drafting emails...</div>
+        <div id="rem-ws" class="output-box" style="display:none;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📈 Per Student Analytics</h2>
+        <div class="controls">
+            <input type="text" id="stu-name" value="Aarav" placeholder="Student Name">
+            <input type="text" id="stu-sub" value="Math" placeholder="Subject">
+            <button onclick="loadStudentAnalytics()">Analyze Student</button>
+        </div>
+        <div id="stu-loading" class="loading-spinner" style="display:none;">Analyzing student history...</div>
+        <div id="stu-ws" class="analytics-container" style="display:none;">
+            <div class="chart-container"><canvas id="stuChart"></canvas></div>
+            <div id="stu-report" class="output-box report-box"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📊 Class Performance Analytics</h2>
+        <button onclick="loadClassAnalytics()">Generate Class Report</button>
+        <div id="ca-loading" class="loading-spinner" style="display: none;">Analyzing class averages...</div>
+        <div id="ca-ws" class="analytics-container" style="display: none;">
+            <div class="chart-container"><canvas id="classChart"></canvas></div>
+            <div id="ca-report" class="output-box report-box"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>💬 🎙️ Universal AI Teaching Assistant</h2>
+        <div class="chat-box" id="chat-history">
+            <div class="chat-msg ai-msg">
+                <strong>AI:</strong> Hello! I can help you brainstorm, generate content, or translate text. You can type below, or use the 🎙️ microphone to speak to me! Click the 🔊 icon next to my messages to hear me speak.
+            </div>
+        </div>
+        <div class="controls" style="margin-bottom: 0; display: flex; gap: 10px;">
+            <button id="dictate-btn" class="btn-red mic-btn" onclick="toggleDictation()" title="Click to speak">🎙️</button>
+            <input type="text" id="chat-input" placeholder="Type or speak your message here..." style="flex: 1; padding: 12px; font-size: 15px;">
+            
+            <select id="chat-lang" style="font-weight: bold; padding: 0 10px;" title="Your Default Profile Language">
+                <option value="English">English</option>
+                <option value="Telugu">Telugu</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Oriya">Oriya</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Sanskrit">Sanskrit</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Kannada">Kannada</option>
+                <option value="Koya">Tribal - Koya</option>
+                <option value="Gondi">Tribal - Gondi</option>
+                <option value="Konda">Tribal - Konda</option>
+                <option value="French">French</option>
+                <option value="Spanish">Spanish</option>
+            </select>
+
+            <button id="chat-btn" class="btn-green" onclick="sendMessage()" style="padding: 0 25px;">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:5000/api/v1/ai/teacher";
+
+    function showUI(wsId, loadId) { document.getElementById(wsId).style.display='block'; document.getElementById(loadId).style.display='none'; }
+    function hideUI(wsId, loadId) { document.getElementById(wsId).style.display='none'; document.getElementById(loadId).style.display='block'; }
+
+    const activeUser = { name: "Teacher Swais", email: "swais@sgs.edu", role: "Teacher" };
+
+    async function fetchWithLog(endpoint, payload) {
+        try {
+            const bodyData = { ...payload, userInfo: activeUser };
+            const res = await fetch(`${API_BASE}${endpoint}`, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(bodyData) 
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Request failed.");
+            return data;
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    // Task 1: Lesson Plan
+    async function generateLessonPlan() {
+        hideUI('core-ws', 'core-loading');
+        try {
+            const data = await fetchWithLog('/lesson-plan', { chapterId: 1 });
+            document.getElementById('core-ws').innerHTML = marked.parse(data.lessonPlan);
+        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
+        showUI('core-ws', 'core-loading');
+    }
+
+    // Task 2: EXAM GENERATOR (Now pulls Total Marks)
+    async function generateQuestionPaper() {
+        hideUI('core-ws', 'core-loading');
+        try {
+            const marksInput = document.getElementById('exam-marks').value || 20;
+            const targetMarks = parseInt(marksInput);
+
+            const data = await fetchWithLog('/question-paper', { chapterId: 1, totalMarks: targetMarks });
+            
+            let htmlContent = `<h3 style="color:#2c3e50; border-bottom:1px solid #ccc; padding-bottom:10px;">📝 ${data.paperTitle || 'Unit Test'}</h3>`;
+            htmlContent += `<p><strong>Total Marks:</strong> ${data.totalMarks}</p><div style="margin-top:20px;">`;
+            if(data.questions && Array.isArray(data.questions)) {
+                data.questions.forEach((q, index) => {
+                    htmlContent += `<div style="margin-bottom: 20px;"><p style="margin-bottom: 5px;"><strong>Q${index + 1}. (${q.type} - ${q.marks} Marks)</strong><br>${q.question}</p>`;
+                    if (q.options && Array.isArray(q.options)) {
+                        htmlContent += `<ul style="margin-top: 5px; list-style-type: lower-alpha;">`;
+                        q.options.forEach(opt => htmlContent += `<li>${opt}</li>`);
+                        htmlContent += `</ul>`;
+                    }
+                    htmlContent += `<p style="font-size: 13px; color: #7f8c8d; background:#eee; padding:5px; border-radius:3px;"><em>Teacher Rubric: ${q.rubric || q.answer}</em></p></div>`;
+                });
+            } else { htmlContent += `<p>Could not parse questions properly.</p>`; }
+            htmlContent += `</div>`;
+            document.getElementById('core-ws').innerHTML = htmlContent;
+        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
+        showUI('core-ws', 'core-loading');
+    }
+
+    // Task 3: CORRECT ANSWER (Safely reads JSON)
+    async function correctAnswer() {
+        hideUI('core-ws', 'core-loading');
+        try {
+            const data = await fetchWithLog('/correct-answer', { question: "What is 2+2?", studentAnswer: "4", maxMarks: 2, rubric: "2 marks for 4" });
+            const marks = data.awardedMarks ?? data.marks ?? 'N/A';
+            const fb = data.feedback ?? data.explanation ?? 'No feedback provided.';
+            document.getElementById('core-ws').innerHTML = `
+                <div style="background: #e8f8f5; padding: 20px; border-radius: 8px; border-left: 6px solid #1abc9c;">
+                    <h3 style="margin-top:0; color: #16a085;">✅ AI Grading Complete</h3>
+                    <p style="font-size: 18px;"><strong>Marks Awarded:</strong> <span style="color: #c0392b; font-weight:bold; font-size:22px;">${marks} / 2</span></p>
+                    <p><strong>Teacher Feedback:</strong> ${fb}</p>
+                </div>`;
+        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
+        showUI('core-ws', 'core-loading');
+    }
+
+    // Task 4: REMINDERS (Safely parses text)
+    async function generateReminders() {
+        hideUI('rem-ws', 'rem-loading');
+        try {
+            const data = await fetchWithLog('/assignment-reminders', {});
+            document.getElementById('rem-ws').innerHTML = marked.parse(data.reminderEmail);
+        } catch(err) { document.getElementById('rem-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
+        showUI('rem-ws', 'rem-loading');
+    }
+
+    // Task 5: STUDENT ANALYTICS
+    let stuChart = null;
+    async function loadStudentAnalytics() {
+        hideUI('stu-ws', 'stu-loading');
+        try {
+            const data = await fetchWithLog('/student-analytics', { studentName: document.getElementById('stu-name').value, subject: document.getElementById('stu-sub').value });
+            document.getElementById('stu-report').innerHTML = marked.parse(data.analysis || "No analysis available.");
+            
+            if(data.chartData && Array.isArray(data.chartData)) {
+                const ctx = document.getElementById('stuChart').getContext('2d');
+                if(stuChart) stuChart.destroy();
+                stuChart = new Chart(ctx, { type: 'line', data: { labels: data.chartData.map(d=>d.test_name), datasets: [{ label: 'Score', data: data.chartData.map(d=>d.score), borderColor: '#8e44ad'}] }});
+            }
+            document.getElementById('stu-ws').style.display='flex';
+        } catch(err) { 
+            document.getElementById('stu-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
+            document.getElementById('stu-ws').style.display='block';
+        } 
+        document.getElementById('stu-loading').style.display='none';
+    }
+
+    // Task 6: Class Analytics
+    let classChart = null;
+    async function loadClassAnalytics() {
+        hideUI('ca-ws', 'ca-loading');
+        try {
+            const data = await fetchWithLog('/class-analytics', {});
+            document.getElementById('ca-report').innerHTML = marked.parse(data.analyticsReport);
+            
+            if (data.data && Array.isArray(data.data)) {
+                const ctx = document.getElementById('classChart').getContext('2d');
+                if(classChart) classChart.destroy();
+                classChart = new Chart(ctx, { type: 'bar', data: { labels: data.data.map(d => d.student), datasets: [ { label: 'Math', data: data.data.map(d => d.math), backgroundColor: '#3498db' }, { label: 'Science', data: data.data.map(d => d.science), backgroundColor: '#2ecc71' } ] }});
+            }
+            document.getElementById('ca-ws').style.display='flex';
+        } catch(err) {
+            document.getElementById('ca-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
+            document.getElementById('ca-ws').style.display='block';
+        } 
+        document.getElementById('ca-loading').style.display='none';
+    }
+
+    // --- VOICE & MULTILINGUAL CHATBOT ---
+    let recognition;
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.onresult = (e) => { 
+            document.getElementById('chat-input').value += e.results[0][0].transcript + " "; 
+            document.getElementById('dictate-btn').innerText = "🎙️"; 
+            document.getElementById('dictate-btn').classList.remove('btn-green');
+            document.getElementById('dictate-btn').classList.add('btn-red');
+        };
+    }
+    function toggleDictation() { 
+        if(recognition){ 
+            document.getElementById('dictate-btn').innerText = "🔴"; 
+            document.getElementById('dictate-btn').classList.remove('btn-red');
+            document.getElementById('dictate-btn').classList.add('btn-green');
+            recognition.start(); 
+        } else {
+            alert("Speech recognition is not supported in this browser.");
+        }
+    }
+
+    function speakChat(btnElement) { 
+        window.speechSynthesis.cancel(); 
+        
+        const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        
+        const selectedLang = document.getElementById('chat-lang').value;
+        
+        const languageCodes = {
+            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
+            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US"
+        };
+
+        const targetLangCode = languageCodes[selectedLang] || "en-US";
+        utterance.lang = targetLangCode;
+
+        const availableVoices = window.speechSynthesis.getVoices();
+        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
+
+        if (!voiceFound && targetLangCode !== "en-US") {
+            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed! Please add it in your device's Language Settings to hear this message.`);
+        } else if (voiceFound) {
+            utterance.voice = voiceFound;
+        }
+
+        window.speechSynthesis.speak(utterance); 
+    }
+
+    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        const targetLang = document.getElementById('chat-lang').value;
+        if(!text) return;
+        
+        const history = document.getElementById('chat-history');
+        history.innerHTML += `<div class="chat-msg user-msg">${text}</div>`;
+        input.value = '';
+        
+        const btn = document.getElementById('chat-btn');
+        btn.disabled = true; btn.innerText = "...";
+        history.scrollTop = history.scrollHeight;
+        
+        try {
+            const data = await fetchWithLog('/chat', { message: text, targetLanguage: targetLang });
+            const rawAiText = data.reply || "I'm sorry, I encountered an error."; 
+            const formattedHTML = marked.parse(rawAiText);
+            
+            history.innerHTML += `
+                <div class="chat-msg ai-msg">
+                    <div class="msg-text">${formattedHTML}</div>
+                    <button class="listen-btn" onclick="speakChat(this)" title="Listen to this message">🔊 Listen</button>
+                </div>`;
+        } catch (err) {
+            history.innerHTML += `<div class="chat-msg ai-msg" style="color:red;">Error: ${err.message}</div>`;
+        } finally {
+            btn.disabled = false; btn.innerText = "Send";
+            history.scrollTop = history.scrollHeight;
+        }
+    }
+
+    document.getElementById('chat-input').addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+</script>
+</body>
+</html>
