@@ -60,8 +60,8 @@
 | **Teacher** | 1, 2. Lesson & Exam Gen | ✅ | `generateLessonPlan` & `generateQuestionPaper` |
 | | 3. Auto Correction | ✅ | `autoCorrectAnswer` |
 | | 4, 5. Assignment Alerts | ✅ | `generateAssignmentReminders` |
-| | 6. Virtual Slate | ⚠️ | UI placeholder; needs a canvas drawing tool |
-| | 7. Annotation Hub Search | ❌ | Out of Scope (as discussed) |
+| | 6. Virtual Slate | ⚠️ | --------------- |
+| | 7. Annotation Hub Search | ❌ | -------------- |
 | | 8, 9. Assessment (Student/Class) | ✅ | Analytics engine integrated |
 | | 10, 11, 12. Multilingual & Voice | ✅ | Integrated |
 | **Parent** | 1, 2. Translation & Voice | ✅ | Integrated |
