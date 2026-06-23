@@ -10,8 +10,8 @@ import pool from './config/db.js'; // Import your DB pool
 import studentRoutes from './routes/studentRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js'; 
 
-// 🛑 TEMPORARILY COMMENTED OUT (Until we create these files)
-// import parentRoutes from './routes/parentRoutes.js';         
+// ✅ UNCOMMENTED PARENT ROUTES
+import parentRoutes from './routes/parentRoutes.js';        
 // import headmasterRoutes from './routes/headmasterRoutes.js'; 
 
 const app = express();
@@ -30,8 +30,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/v1/ai/tutoring', studentRoutes);
 app.use('/api/v1/ai/teacher', teacherRoutes);
 
-// 🛑 TEMPORARILY COMMENTED OUT (Until we create these files)
-// app.use('/api/v1/ai/parent', parentRoutes);         
+// ✅ UNCOMMENTED PARENT DASHBOARD
+app.use('/api/v1/ai/parent', parentRoutes);         
 // app.use('/api/v1/ai/headmaster', headmasterRoutes); 
 
 // 🔍 DATABASE CONNECTION TEST

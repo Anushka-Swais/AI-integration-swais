@@ -20,7 +20,7 @@
         .btn-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; transition: 0.2s; }
         button:hover { opacity: 0.9; transform: translateY(-1px); }
-        button:disabled { background: #ccc !important; cursor: not-allowed; transform: none; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; transform: none; opacity: 0.7; }
         select, input[type="text"] { padding: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
         
         .btn-small { background-color: #9b59b6; }
@@ -59,9 +59,9 @@
     <div class="dashboard-section">
         <h2>📖 AI Paced Learning</h2>
         <div class="btn-group">
-            <button class="btn-small" onclick="generateContent('small')">Small Pace</button>
-            <button class="btn-average" onclick="generateContent('average')">Average Pace</button>
-            <button class="btn-quick" onclick="generateContent('quick')">Quick Pace</button>
+            <button class="btn-small" onclick="generateContent('small', this)">Small Pace</button>
+            <button class="btn-average" onclick="generateContent('average', this)">Average Pace</button>
+            <button class="btn-quick" onclick="generateContent('quick', this)">Quick Pace</button>
         </div>
         <div id="content-loading" class="loading-spinner" style="display: none;">✍️ Gemini is rewriting the chapter...</div>
         <div id="paced-content-workspace" class="output-box" style="display: none;"></div>
@@ -69,7 +69,7 @@
 
     <div class="dashboard-section">
         <h2>📝 AI Practice Quiz</h2>
-        <button class="btn-quiz" id="quiz-btn" onclick="triggerQuizGeneration()">Generate Practice Quiz</button>
+        <button class="btn-quiz" id="quiz-btn" onclick="triggerQuizGeneration(this)">Generate Practice Quiz</button>
         <div id="quiz-loading" class="loading-spinner" style="display: none;">⚙️ Crafting your questions...</div>
         <div id="quiz-container"></div>
         <div id="quiz-summary" class="output-box" style="display:none; background-color: #e8f8f5; border-color: #2ecc71;"></div>
@@ -77,7 +77,7 @@
 
     <div class="dashboard-section">
         <h2>📊 Performance Analytics</h2>
-        <button class="btn-analytics" id="analytics-btn" onclick="loadAnalytics()">Generate Self-Assessment Report</button>
+        <button class="btn-analytics" id="analytics-btn" onclick="loadAnalytics(this)">Generate Self-Assessment Report</button>
         <div id="analytics-loading" class="loading-spinner" style="display: none;">📊 Crunching your metrics...</div>
         <div id="analytics-workspace" style="display: none;" class="analytics-container">
             <div class="chart-container"><canvas id="performanceChart"></canvas></div>
@@ -122,7 +122,8 @@
 <script>
     const API_BASE = "http://localhost:5000/api/v1/ai/tutoring";
 
-    const activeUser = { name: "Student Priya", email: "priya@sgs.edu", role: "Student" };
+    // Attached ID so the Database knows exactly which student is querying
+    const activeUser = { id: 1, name: "Student Priya", email: "priya@sgs.edu", role: "Student" };
 
     async function fetchWithLog(endpoint, payload) {
         const bodyData = { ...payload, userInfo: activeUser };
@@ -136,8 +137,9 @@
         return data;
     }
 
-    // Paced Content
-    async function generateContent(pace) {
+    // Paced Content (with anti-spam)
+    async function generateContent(pace, btn) {
+        if(btn) btn.disabled = true;
         const workspace = document.getElementById('paced-content-workspace');
         const loading = document.getElementById('content-loading');
         workspace.style.display = 'none'; loading.style.display = 'block';
@@ -148,18 +150,22 @@
             if (window.MathJax) MathJax.typesetPromise();
         } catch (err) {
             workspace.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
-        } finally { loading.style.display = 'none'; workspace.style.display = 'block'; }
+        } finally { 
+            loading.style.display = 'none'; 
+            workspace.style.display = 'block'; 
+            if(btn) btn.disabled = false;
+        }
     }
 
-    // Quiz Generator & Grading
+    // Quiz Generator & Grading (with anti-spam)
     let currentQuiz = [];
-    async function triggerQuizGeneration() {
-        const btn = document.getElementById('quiz-btn');
+    async function triggerQuizGeneration(btn) {
+        if(btn) btn.disabled = true;
         const loading = document.getElementById('quiz-loading');
         const container = document.getElementById('quiz-container');
         const summary = document.getElementById('quiz-summary');
         
-        btn.disabled = true; container.innerHTML = ''; summary.style.display = 'none'; loading.style.display = 'block';
+        container.innerHTML = ''; summary.style.display = 'none'; loading.style.display = 'block';
 
         try {
             const data = await fetchWithLog('/generate-quiz', { chapterId: 1 });
@@ -172,7 +178,10 @@
             if (window.MathJax) MathJax.typesetPromise();
         } catch (err) {
             container.innerHTML = `<div class="output-box error-text">🚨 ${err.message}</div>`;
-        } finally { btn.disabled = false; loading.style.display = 'none'; }
+        } finally { 
+            if(btn) btn.disabled = false; 
+            loading.style.display = 'none'; 
+        }
     }
 
     function grade() {
@@ -196,43 +205,46 @@
         summaryDiv.innerHTML = `<h3 style="margin-top:0; color:#27ae60;">🎯 Quiz Complete!</h3><p style="font-size: 18px;">You scored <strong>${correctCount} out of ${totalCount}</strong>.</p><p style="margin-bottom:0;">Review your answers above to see detailed explanations from the AI Tutor.</p>`;
     }
 
-    // Analytics
+    // Analytics (with dynamic DB rendering)
     let chartInstance = null;
-    async function loadAnalytics() {
-        const btn = document.getElementById('analytics-btn');
+    async function loadAnalytics(btn) {
+        if(btn) btn.disabled = true;
         const loading = document.getElementById('analytics-loading');
         const workspace = document.getElementById('analytics-workspace');
         const aiText = document.getElementById('ai-report-text');
         
-        btn.disabled = true; workspace.style.display = 'none'; loading.style.display = 'block';
+        workspace.style.display = 'none'; loading.style.display = 'block';
 
         try {
             const data = await fetchWithLog('/analytics', {});
             aiText.innerHTML = marked.parse(data.aiReportCard);
             workspace.style.display = 'flex';
             
-            const mathData = data.chartData.filter(g => g.subject === 'Math');
-            const scienceData = data.chartData.filter(g => g.subject === 'Science');
             const ctx = document.getElementById('performanceChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
+            
+            // Render the dynamic scores from the database
             chartInstance = new Chart(ctx, { 
-                type: 'line', 
+                type: 'bar', 
                 data: { 
-                    labels: mathData.map(g => g.test_name), 
+                    labels: data.chartData.map(g => g.test_name), 
                     datasets: [ 
-                        { label: 'Math', data: mathData.map(g => g.score), borderColor: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.2)', borderWidth: 2 }, 
-                        { label: 'Science', data: scienceData.map(g => g.score), borderColor: '#2ecc71', backgroundColor: 'rgba(46, 204, 113, 0.2)', borderWidth: 2 } 
+                        { label: 'Score %', data: data.chartData.map(g => g.score), backgroundColor: '#3498db' } 
                     ] 
                 }, 
                 options: { scales: { y: { min: 0, max: 100 } } } 
             });
         } catch (err) {
-            workspace.style.display = 'flex'; aiText.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; document.querySelector('.chart-container').style.display = 'none';
-        } finally { btn.disabled = false; loading.style.display = 'none'; }
+            workspace.style.display = 'flex'; 
+            aiText.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+            document.querySelector('.chart-container').style.display = 'none';
+        } finally { 
+            if(btn) btn.disabled = false; 
+            loading.style.display = 'none'; 
+        }
     }
 
     // --- VOICE & MULTILINGUAL CHATBOT ---
-
     let recognition;
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
@@ -250,7 +262,6 @@
         } else { alert("Speech recognition is not supported in this browser."); }
     }
 
-    // UPGRADED TEXT-TO-SPEECH (With Hardware Voice Checking)
     function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
         
@@ -270,12 +281,11 @@
         const targetLangCode = languageCodes[selectedLang] || "en-US";
         utterance.lang = targetLangCode;
 
-        // CHECK: Does the user's computer actually have this voice installed?
         const availableVoices = window.speechSynthesis.getVoices();
         const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
 
         if (!voiceFound && targetLangCode !== "en-US") {
-            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed! Please add it in your device's Language Settings to hear this message.`);
+            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed!`);
         } else if (voiceFound) {
             utterance.voice = voiceFound;
         }
@@ -283,7 +293,6 @@
         window.speechSynthesis.speak(utterance); 
     }
 
-    // Help Chrome load voices smoothly
     window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
 
     async function sendChatMessage() {

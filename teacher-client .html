@@ -17,7 +17,7 @@
         select, input[type="text"], input[type="number"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
         button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; background-color: #8e44ad; transition: 0.2s;}
         button:hover { opacity: 0.9; }
-        button:disabled { background: #ccc !important; cursor: not-allowed; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.7; }
         .btn-green { background-color: #27ae60; } .btn-blue { background-color: #2980b9; } .btn-red { background-color: #e74c3c; }
         .output-box { background: #f8f9fa; border: 1px solid #e1e8ed; padding: 20px; border-radius: 4px; margin-top: 15px; font-size: 15px; line-height: 1.6; overflow-x: auto; }
         .loading-spinner { color: #8e44ad; font-style: italic; margin: 15px 0; padding: 10px; background: #f5eef8; border-left: 4px solid #8e44ad; }
@@ -42,14 +42,14 @@
     <div class="dashboard-section">
         <h2>📑 Core Teacher Tools</h2>
         <div class="controls">
-            <button onclick="generateLessonPlan()">Generate Lesson Plan</button>
+            <button onclick="generateLessonPlan(this)">Generate Lesson Plan</button>
             
             <div style="display:flex; align-items:center; gap:5px;">
                 <input type="number" id="exam-marks" value="20" placeholder="Total Marks" style="width: 80px;" title="Total Marks for the Exam">
-                <button onclick="generateQuestionPaper()">Generate Exam Paper</button>
+                <button onclick="generateQuestionPaper(this)">Generate Exam Paper</button>
             </div>
 
-            <button onclick="correctAnswer()">Grade Sample Answer</button>
+            <button onclick="correctAnswer(this)">Grade Sample Answer</button>
         </div>
         <div id="core-loading" class="loading-spinner" style="display:none;">Processing request with AI...</div>
         <div id="core-ws" class="output-box" style="display:none;"></div>
@@ -57,7 +57,7 @@
 
     <div class="dashboard-section">
         <h2>📅 Assignment Reminders</h2>
-        <button onclick="generateReminders()">Draft Reminders for Missing Work</button>
+        <button onclick="generateReminders(this)">Draft Reminders for Missing Work</button>
         <div id="rem-loading" class="loading-spinner" style="display:none;">Drafting emails...</div>
         <div id="rem-ws" class="output-box" style="display:none;"></div>
     </div>
@@ -65,9 +65,8 @@
     <div class="dashboard-section">
         <h2>📈 Per Student Analytics</h2>
         <div class="controls">
-            <input type="text" id="stu-name" value="Aarav" placeholder="Student Name">
-            <input type="text" id="stu-sub" value="Math" placeholder="Subject">
-            <button onclick="loadStudentAnalytics()">Analyze Student</button>
+            <input type="text" id="stu-name" value="Aryan" placeholder="Student Name">
+            <button onclick="loadStudentAnalytics(this)">Analyze Student</button>
         </div>
         <div id="stu-loading" class="loading-spinner" style="display:none;">Analyzing student history...</div>
         <div id="stu-ws" class="analytics-container" style="display:none;">
@@ -78,7 +77,7 @@
 
     <div class="dashboard-section">
         <h2>📊 Class Performance Analytics</h2>
-        <button onclick="loadClassAnalytics()">Generate Class Report</button>
+        <button onclick="loadClassAnalytics(this)">Generate Class Report</button>
         <div id="ca-loading" class="loading-spinner" style="display: none;">Analyzing class averages...</div>
         <div id="ca-ws" class="analytics-container" style="display: none;">
             <div class="chart-container"><canvas id="classChart"></canvas></div>
@@ -99,15 +98,15 @@
             
             <select id="chat-lang" style="font-weight: bold; padding: 0 10px;" title="Your Default Profile Language">
                 <option value="English">English</option>
-                <option value="Telugu">Telugu</option>
                 <option value="Hindi">Hindi</option>
-                <option value="Oriya">Oriya</option>
-                <option value="Bengali">Bengali</option>
-                <option value="Marathi">Marathi</option>
-                <option value="Sanskrit">Sanskrit</option>
+                <option value="Telugu">Telugu</option>
                 <option value="Tamil">Tamil</option>
-                <option value="Malayalam">Malayalam</option>
                 <option value="Kannada">Kannada</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Oriya">Oriya</option>
+                <option value="Sanskrit">Sanskrit</option>
                 <option value="Koya">Tribal - Koya</option>
                 <option value="Gondi">Tribal - Gondi</option>
                 <option value="Konda">Tribal - Konda</option>
@@ -126,7 +125,7 @@
     function showUI(wsId, loadId) { document.getElementById(wsId).style.display='block'; document.getElementById(loadId).style.display='none'; }
     function hideUI(wsId, loadId) { document.getElementById(wsId).style.display='none'; document.getElementById(loadId).style.display='block'; }
 
-    const activeUser = { name: "Teacher Swais", email: "swais@sgs.edu", role: "Teacher" };
+    const activeUser = { id: 3, name: "Teacher Priya", email: "priya@sgs.edu", role: "Teacher" };
 
     async function fetchWithLog(endpoint, payload) {
         try {
@@ -145,23 +144,27 @@
     }
 
     // Task 1: Lesson Plan
-    async function generateLessonPlan() {
+    async function generateLessonPlan(btn) {
+        if(btn) btn.disabled = true; // Disable button to prevent spam
         hideUI('core-ws', 'core-loading');
         try {
             const data = await fetchWithLog('/lesson-plan', { chapterId: 1 });
             document.getElementById('core-ws').innerHTML = marked.parse(data.lessonPlan);
-        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
-        showUI('core-ws', 'core-loading');
+        } catch(err) { 
+            document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('core-ws', 'core-loading');
+            if(btn) btn.disabled = false; // Re-enable button
+        }
     }
 
-    // Task 2: EXAM GENERATOR (Now pulls Total Marks)
-    async function generateQuestionPaper() {
+    // Task 2: EXAM GENERATOR 
+    async function generateQuestionPaper(btn) {
+        if(btn) btn.disabled = true;
         hideUI('core-ws', 'core-loading');
         try {
             const marksInput = document.getElementById('exam-marks').value || 20;
-            const targetMarks = parseInt(marksInput);
-
-            const data = await fetchWithLog('/question-paper', { chapterId: 1, totalMarks: targetMarks });
+            const data = await fetchWithLog('/question-paper', { chapterId: 1, totalMarks: parseInt(marksInput) });
             
             let htmlContent = `<h3 style="color:#2c3e50; border-bottom:1px solid #ccc; padding-bottom:10px;">📝 ${data.paperTitle || 'Unit Test'}</h3>`;
             htmlContent += `<p><strong>Total Marks:</strong> ${data.totalMarks}</p><div style="margin-top:20px;">`;
@@ -178,12 +181,17 @@
             } else { htmlContent += `<p>Could not parse questions properly.</p>`; }
             htmlContent += `</div>`;
             document.getElementById('core-ws').innerHTML = htmlContent;
-        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
-        showUI('core-ws', 'core-loading');
+        } catch(err) { 
+            document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('core-ws', 'core-loading');
+            if(btn) btn.disabled = false;
+        }
     }
 
-    // Task 3: CORRECT ANSWER (Safely reads JSON)
-    async function correctAnswer() {
+    // Task 3: CORRECT ANSWER 
+    async function correctAnswer(btn) {
+        if(btn) btn.disabled = true;
         hideUI('core-ws', 'core-loading');
         try {
             const data = await fetchWithLog('/correct-answer', { question: "What is 2+2?", studentAnswer: "4", maxMarks: 2, rubric: "2 marks for 4" });
@@ -195,44 +203,64 @@
                     <p style="font-size: 18px;"><strong>Marks Awarded:</strong> <span style="color: #c0392b; font-weight:bold; font-size:22px;">${marks} / 2</span></p>
                     <p><strong>Teacher Feedback:</strong> ${fb}</p>
                 </div>`;
-        } catch(err) { document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
-        showUI('core-ws', 'core-loading');
+        } catch(err) { 
+            document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('core-ws', 'core-loading');
+            if(btn) btn.disabled = false;
+        }
     }
 
-    // Task 4: REMINDERS (Safely parses text)
-    async function generateReminders() {
+    // Task 4: REMINDERS 
+    async function generateReminders(btn) {
+        if(btn) btn.disabled = true;
         hideUI('rem-ws', 'rem-loading');
         try {
             const data = await fetchWithLog('/assignment-reminders', {});
-            document.getElementById('rem-ws').innerHTML = marked.parse(data.reminderEmail);
-        } catch(err) { document.getElementById('rem-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
-        showUI('rem-ws', 'rem-loading');
+            
+            let displayHTML = marked.parse(data.reminderEmail);
+            if(data.list && data.list.length > 0) {
+                displayHTML += `<h4>Students Missing Work:</h4><ul>`;
+                data.list.forEach(item => displayHTML += `<li>${item.student} - ${item.task} (Due: ${item.due})</li>`);
+                displayHTML += `</ul>`;
+            }
+            document.getElementById('rem-ws').innerHTML = displayHTML;
+        } catch(err) { 
+            document.getElementById('rem-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('rem-ws', 'rem-loading');
+            if(btn) btn.disabled = false;
+        }
     }
 
     // Task 5: STUDENT ANALYTICS
     let stuChart = null;
-    async function loadStudentAnalytics() {
+    async function loadStudentAnalytics(btn) {
+        if(btn) btn.disabled = true;
         hideUI('stu-ws', 'stu-loading');
         try {
-            const data = await fetchWithLog('/student-analytics', { studentName: document.getElementById('stu-name').value, subject: document.getElementById('stu-sub').value });
+            const data = await fetchWithLog('/student-analytics', { studentName: document.getElementById('stu-name').value });
             document.getElementById('stu-report').innerHTML = marked.parse(data.analysis || "No analysis available.");
             
             if(data.chartData && Array.isArray(data.chartData)) {
                 const ctx = document.getElementById('stuChart').getContext('2d');
                 if(stuChart) stuChart.destroy();
-                stuChart = new Chart(ctx, { type: 'line', data: { labels: data.chartData.map(d=>d.test_name), datasets: [{ label: 'Score', data: data.chartData.map(d=>d.score), borderColor: '#8e44ad'}] }});
+                stuChart = new Chart(ctx, { type: 'line', data: { labels: data.chartData.map(d=>d.test_name), datasets: [{ label: 'Score %', data: data.chartData.map(d=>d.score), borderColor: '#8e44ad', backgroundColor: 'rgba(142, 68, 173, 0.2)', fill: true}] }});
             }
             document.getElementById('stu-ws').style.display='flex';
         } catch(err) { 
             document.getElementById('stu-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
             document.getElementById('stu-ws').style.display='block';
-        } 
-        document.getElementById('stu-loading').style.display='none';
+        } finally {
+            document.getElementById('stu-loading').style.display='none';
+            if(btn) btn.disabled = false;
+        }
     }
 
     // Task 6: Class Analytics
     let classChart = null;
-    async function loadClassAnalytics() {
+    async function loadClassAnalytics(btn) {
+        if(btn) btn.disabled = true;
         hideUI('ca-ws', 'ca-loading');
         try {
             const data = await fetchWithLog('/class-analytics', {});
@@ -241,17 +269,25 @@
             if (data.data && Array.isArray(data.data)) {
                 const ctx = document.getElementById('classChart').getContext('2d');
                 if(classChart) classChart.destroy();
-                classChart = new Chart(ctx, { type: 'bar', data: { labels: data.data.map(d => d.student), datasets: [ { label: 'Math', data: data.data.map(d => d.math), backgroundColor: '#3498db' }, { label: 'Science', data: data.data.map(d => d.science), backgroundColor: '#2ecc71' } ] }});
+                classChart = new Chart(ctx, { 
+                    type: 'bar', 
+                    data: { 
+                        labels: data.data.map(d => d.student), 
+                        datasets: [ { label: 'Overall Average %', data: data.data.map(d => d.overall_score), backgroundColor: '#3498db' } ] 
+                    }
+                });
             }
             document.getElementById('ca-ws').style.display='flex';
         } catch(err) {
             document.getElementById('ca-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
             document.getElementById('ca-ws').style.display='block';
-        } 
-        document.getElementById('ca-loading').style.display='none';
+        } finally {
+            document.getElementById('ca-loading').style.display='none';
+            if(btn) btn.disabled = false;
+        }
     }
 
-    // --- VOICE & MULTILINGUAL CHATBOT ---
+    // --- VOICE CHAT ---
     let recognition;
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
@@ -275,36 +311,10 @@
 
     function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
-        
         const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        
-        const selectedLang = document.getElementById('chat-lang').value;
-        
-        const languageCodes = {
-            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
-            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
-            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
-            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
-            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US"
-        };
-
-        const targetLangCode = languageCodes[selectedLang] || "en-US";
-        utterance.lang = targetLangCode;
-
-        const availableVoices = window.speechSynthesis.getVoices();
-        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
-
-        if (!voiceFound && targetLangCode !== "en-US") {
-            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed! Please add it in your device's Language Settings to hear this message.`);
-        } else if (voiceFound) {
-            utterance.voice = voiceFound;
-        }
-
         window.speechSynthesis.speak(utterance); 
     }
-
-    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
 
     async function sendMessage() {
         const input = document.getElementById('chat-input');

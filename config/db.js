@@ -10,7 +10,13 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: parseInt(process.env.DB_PORT),
-  connectionTimeoutMillis: 3000, 
+  
+  // ❌ SSL REMOVED: Your server explicitly does not support it
+  
+  // ✅ Keep these stability settings to prevent timeouts on big AI requests
+  connectionTimeoutMillis: 15000, 
+  idleTimeoutMillis: 30000,       
+  keepAlive: true                 
 });
 
 pool.on('error', (err) => {

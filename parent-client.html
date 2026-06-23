@@ -18,7 +18,7 @@
         select, input[type="text"], textarea { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
         button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; transition: 0.2s; background-color: #16a085;}
         button:hover { background-color: #12876f; transform: translateY(-1px); }
-        button:disabled { background: #ccc !important; cursor: not-allowed; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.7; }
         .btn-blue { background-color: #2980b9; } .btn-blue:hover { background-color: #1f618d; }
         
         .output-box { background: #f8f9fa; border: 1px solid #e1e8ed; padding: 20px; border-radius: 4px; margin-top: 15px; font-size: 15px; line-height: 1.6; }
@@ -37,7 +37,7 @@
 
     <div class="dashboard-section">
         <h2>📅 Assignment Tracker Report</h2>
-        <button id="task-btn" onclick="loadAssignments()">Generate Assignment Update</button>
+        <button onclick="loadAssignments(this)">Generate Assignment Update</button>
         <div id="task-loading" class="loading-spinner" style="display: none;">Checking your child's planner...</div>
         <div id="task-workspace" class="output-box" style="display: none;"></div>
     </div>
@@ -50,7 +50,7 @@
                 <option value="single">Specific Subject</option>
             </select>
             <input type="text" id="perf-subject" placeholder="e.g., Math" style="display: none;">
-            <button id="perf-btn" onclick="loadAnalytics()">Generate Progress Report</button> 
+            <button onclick="loadAnalytics(this)">Generate Progress Report</button> 
         </div>
         
         <div id="perf-loading" class="loading-spinner" style="display: none;">Analyzing test scores...</div>
@@ -68,22 +68,23 @@
         
         <div class="controls">
             <select id="lang-select">
+                <option value="English">English</option>
                 <option value="Hindi">Hindi</option>
                 <option value="Telugu">Telugu</option>
-                <option value="Oriya">Oriya</option>
-                <option value="Bengali">Bengali</option>
-                <option value="Marathi">Marathi</option>
-                <option value="Sanskrit">Sanskrit</option>
                 <option value="Tamil">Tamil</option>
-                <option value="Malayalam">Malayalam</option>
                 <option value="Kannada">Kannada</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Oriya">Oriya</option>
+                <option value="Sanskrit">Sanskrit</option>
                 <option value="Koya">Tribal - Koya</option>
                 <option value="Gondi">Tribal - Gondi</option>
                 <option value="Konda">Tribal - Konda</option>
                 <option value="Spanish">Spanish</option>
                 <option value="French">French</option>
             </select>
-            <button id="trans-btn" onclick="translateText()">Translate Text</button>
+            <button onclick="translateText(this)">Translate Text</button>
             <button onclick="speakText()" class="btn-blue">🔊 Listen (Read Aloud)</button>
         </div>
     </div>
@@ -92,10 +93,9 @@
 <script>
     const API_BASE = "http://localhost:5000/api/v1/ai/parent";
 
-    // Mock Parent Profile for DB Logging
-    const activeUser = { name: "Parent Ravi", email: "ravi@sgs.edu", role: "Parent" };
+    // Attached ID so the Database queries the correct Parent-Student Mapping
+    const activeUser = { id: 1, name: "Parent Ravi", email: "ravi@sgs.edu", role: "Parent" };
 
-    // Custom Fetch wrapper to inject User Data
     async function fetchWithLog(endpoint, payload) {
         const bodyData = { ...payload, userInfo: activeUser };
         const res = await fetch(`${API_BASE}${endpoint}`, { 
@@ -109,17 +109,29 @@
     }
 
     // 1. Assignment Report
-    async function loadAssignments() {
-        const btn = document.getElementById('task-btn');
+    async function loadAssignments(btn) {
+        if(btn) btn.disabled = true;
         const loading = document.getElementById('task-loading');
         const ws = document.getElementById('task-workspace');
         
-        btn.disabled = true; ws.style.display = 'none'; loading.style.display = 'block';
+        ws.style.display = 'none'; loading.style.display = 'block';
         try {
             const data = await fetchWithLog('/assignments', {});
-            ws.innerHTML = `<strong>AI Assistant Note:</strong><br>${marked.parse(data.report)}`;
-        } catch(err) { ws.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; }
-        finally { loading.style.display = 'none'; ws.style.display = 'block'; btn.disabled = false; }
+            
+            let displayHTML = `<strong>AI Assistant Note:</strong><br>${marked.parse(data.report)}`;
+            if(data.list && data.list.length > 0) {
+                displayHTML += `<hr><h4>Recent Tasks:</h4><ul>`;
+                data.list.forEach(item => displayHTML += `<li><strong>${item.subject} (${item.task})</strong>: ${item.status}</li>`);
+                displayHTML += `</ul>`;
+            }
+            ws.innerHTML = displayHTML;
+        } catch(err) { 
+            ws.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally { 
+            loading.style.display = 'none'; 
+            ws.style.display = 'block'; 
+            if(btn) btn.disabled = false; 
+        }
     }
 
     function toggleSubjectInput() {
@@ -129,65 +141,104 @@
 
     // 2 & 3. Performance Analytics
     let chartInstance = null;
-    async function loadAnalytics() {
-        const btn = document.getElementById('perf-btn');
+    async function loadAnalytics(btn) {
+        if(btn) btn.disabled = true;
         const loading = document.getElementById('perf-loading');
         const ws = document.getElementById('perf-workspace');
         const scope = document.getElementById('perf-scope').value;
         const subject = document.getElementById('perf-subject').value;
         
-        btn.disabled = true; ws.style.display = 'none'; loading.style.display = 'block';
+        ws.style.display = 'none'; loading.style.display = 'block';
+        
         try {
             const data = await fetchWithLog('/analytics', { scope, subject });
-            document.getElementById('perf-report').innerHTML = `<strong>Counselor Notes:</strong><br>${marked.parse(data.analysis)}`;
             
-            if(data.chartData && Array.isArray(data.chartData)) {
+            document.getElementById('perf-report').innerHTML = `<strong>Counselor Notes:</strong><br>${marked.parse(data.analysis || "No notes generated.")}`;
+            
+            if (data.chartData && Array.isArray(data.chartData) && data.chartData.length > 0) {
                 const ctx = document.getElementById('perfChart').getContext('2d');
-                if(chartInstance) chartInstance.destroy();
+                if (chartInstance) chartInstance.destroy();
                 
-                if (scope === 'all') {
-                    chartInstance = new Chart(ctx, { 
-                        type: 'bar', 
-                        data: { 
-                            labels: data.chartData.map(g => g.subject), 
-                            datasets: [{ label: 'Score', data: data.chartData.map(g => g.score), backgroundColor: '#16a085' }] 
-                        } 
-                    });
-                } else {
-                    chartInstance = new Chart(ctx, { 
-                        type: 'line', 
-                        data: { 
-                            labels: data.chartData.map(g => g.test_name), 
-                            datasets: [{ label: `${subject} Scores`, data: data.chartData.map(g => g.score), borderColor: '#2980b9' }] 
-                        } 
-                    });
-                }
+                const chartLabels = scope === 'all' 
+                    ? data.chartData.map(g => g.subject) 
+                    : data.chartData.map(g => g.test_name);
+                    
+                const chartScores = data.chartData.map(g => g.score);
+
+                chartInstance = new Chart(ctx, { 
+                    type: scope === 'all' ? 'bar' : 'line', 
+                    data: { 
+                        labels: chartLabels, 
+                        datasets: [{ 
+                            label: scope === 'all' ? 'Overall Average %' : `${subject || 'Subject'} Score %`, 
+                            data: chartScores, 
+                            backgroundColor: '#16a085',
+                            borderColor: '#2980b9',
+                            fill: scope !== 'all'
+                        }] 
+                    },
+                    options: { scales: { y: { min: 0, max: 100 } } }
+                });
             }
             ws.style.display = 'flex';
-        } catch(err) { document.getElementById('perf-report').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; ws.style.display = 'flex'; }
-        finally { loading.style.display = 'none'; btn.disabled = false; }
+        } catch(err) { 
+            document.getElementById('perf-report').innerHTML = `<span class="error-text">🚨 UI Error: ${err.message}</span>`; 
+            ws.style.display = 'flex'; 
+        } finally { 
+            loading.style.display = 'none'; 
+            if(btn) btn.disabled = false; 
+        }
     }
 
     // 4 & 5. Translate & Voice
-    async function translateText() {
+    async function translateText(btn) {
         const text = document.getElementById('comm-text').value;
         const lang = document.getElementById('lang-select').value;
-        const btn = document.getElementById('trans-btn');
         if(!text) return;
         
-        btn.disabled = true; btn.innerText = "Translating...";
+        if(btn) { btn.disabled = true; btn.innerText = "Translating..."; }
         try {
             const data = await fetchWithLog('/translate', { text: text, targetLanguage: lang });
             document.getElementById('comm-text').value = data.translation;
-        } catch(err) { alert("Translation error: " + err.message); }
-        finally { btn.disabled = false; btn.innerText = "Translate Text"; }
+        } catch(err) { 
+            alert("Translation error: " + err.message); 
+        } finally { 
+            if(btn) { btn.disabled = false; btn.innerText = "Translate Text"; }
+        }
     }
 
+    // Advanced Text-to-Speech logic
     function speakText() {
+        window.speechSynthesis.cancel();
         const text = document.getElementById('comm-text').value;
         if (!text) return;
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        const selectedLang = document.getElementById('lang-select').value;
+        
+        const languageCodes = {
+            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
+            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" 
+        };
+
+        const targetLangCode = languageCodes[selectedLang] || "en-US";
+        utterance.lang = targetLangCode;
+
+        const availableVoices = window.speechSynthesis.getVoices();
+        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
+
+        if (!voiceFound && targetLangCode !== "en-US") {
+            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed!`);
+        } else if (voiceFound) {
+            utterance.voice = voiceFound;
+        }
+
+        window.speechSynthesis.speak(utterance);
     }
+    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
 </script>
 </body>
 </html>

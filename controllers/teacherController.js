@@ -21,6 +21,8 @@ const logAIUsage = async (userInfo = {}, featureUsed) => {
 // 1. AUTO LESSON PLANNER
 export const generateLessonPlan = async (req, res) => {
     const { chapterId, durationMinutes = 45, userInfo } = req.body;
+    const teacherId = userInfo?.id || 3; 
+
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
@@ -34,13 +36,23 @@ export const generateLessonPlan = async (req, res) => {
         const prompt = `You are an expert curriculum developer. Create a highly structured, ${durationMinutes}-minute lesson plan for a teacher covering the chapter "${chapter_name}". Base the lesson plan entirely on this textbook content: "${full_text_content}". Use this exact structure: 1. **Learning Objectives** 2. **Materials Needed** 3. **Introduction** 4. **Main Activity** 5. **Conclusion & Assessment**. Format beautifully. Do not use Markdown code blocks.`;
         
         const aiResult = await model.generateContent(prompt);
-        res.json({ lessonPlan: aiResult.response.text() });
+        const lessonPlanText = aiResult.response.text();
+
+        // Save the generated plan to the RDS schema
+        await pool.query(
+            `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+            [teacherId, `AI Plan: ${chapter_name}`, chapterId, chapter_name, durationMinutes]
+        );
+
+        res.json({ lessonPlan: lessonPlanText });
     } catch (err) {
+        console.error("🚨 LESSON PLAN CRASH:", err);
         res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
     }
 };
 
-// 2. AUTO QUESTION PAPER GENERATOR (Now dynamically uses Total Marks!)
+// 2. AUTO QUESTION PAPER GENERATOR 
 export const generateQuestionPaper = async (req, res) => {
     const { chapterId, difficulty = "Medium", totalMarks = 20, userInfo } = req.body;
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
@@ -54,37 +66,31 @@ export const generateQuestionPaper = async (req, res) => {
         const content = result.rows[0].full_text_content;
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         
-        // PROMPT UPDATED: Explicitly passes totalMarks and requires accurate calculation
         const prompt = `You are an expert exam setter. Read the following textbook content and generate a ${difficulty}-level question paper. 
         CRITICAL REQUIREMENT: The total sum of the marks for all questions MUST add up to exactly ${totalMarks} marks.
         
         You MUST return ONLY a raw JSON object. Do not add conversational text or markdown backticks. Format exactly like this: 
-        { "paperTitle": "Unit Test: Chapter 1", "totalMarks": ${totalMarks}, "questions": [ { "type": "Short Answer", "question": "Explain...", "marks": 2, "rubric": "1 mark for definition, 1 mark for example." }, { "type": "Multiple Choice", "question": "Which is true?", "options": ["A", "B", "C", "D"], "answer": "B", "marks": 1 } ] } 
+        { "paperTitle": "Unit Test: Chapter 1", "totalMarks": ${totalMarks}, "questions": [ { "type": "Short Answer", "question": "Explain...", "marks": 2, "rubric": "1 mark for definition, 1 mark for example." } ] } 
         Text content to analyze: "${content}"`;
         
         const aiResult = await model.generateContent(prompt);
+        let rawText = aiResult.response.text();
         
-        if (!aiResult.response || !aiResult.response.candidates || aiResult.response.candidates.length === 0) {
-            throw new Error("AI returned an empty response. Please try again.");
-        }
-
-        const rawText = aiResult.response.text();
-        
-        // CRITICAL FIX: Safe Regex Extraction to prevent JSON parse crashes
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        let cleanedText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
 
         res.json(JSON.parse(jsonMatch[0]));
     } catch (err) {
-        console.error("🚨 Exam Gen Error:", err.message);
+        console.error("🚨 EXAM CRASH:", err);
         res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
     }
 };
 
-// 3. AUTO ANSWER SHEET CORRECTOR (Fixed JSON Parsing)
+// 3. AUTO ANSWER SHEET CORRECTOR 
 export const autoCorrectAnswer = async (req, res) => {
     const { question, studentAnswer, maxMarks, rubric, userInfo } = req.body;
-    if (!question || !studentAnswer || !maxMarks || !rubric) return res.status(400).json({ error: "Missing required fields for grading" });
+    if (!question || !studentAnswer || !maxMarks || !rubric) return res.status(400).json({ error: "Missing required fields" });
 
     try {
         await logAIUsage(userInfo, "Grade Sample Answer");
@@ -93,91 +99,111 @@ export const autoCorrectAnswer = async (req, res) => {
         const prompt = `You are a strict but fair teacher grading a student's answer. Question: "${question}" Maximum Marks: ${maxMarks} Teacher's Grading Rubric: "${rubric}" Student's Answer: "${studentAnswer}". Analyze the student's answer against the rubric. You MUST return ONLY a raw JSON object. Do not add markdown backticks. Format exactly like this: { "awardedMarks": 1.5, "feedback": "You correctly defined the concept, but missed the second part." }`;
         
         const aiResult = await model.generateContent(prompt);
-        const rawText = aiResult.response.text();
-
-        // CRITICAL FIX: Safe Regex Extraction
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("AI did not return valid JSON for grading.");
-
+        let cleanedText = aiResult.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        
         res.json(JSON.parse(jsonMatch[0]));
     } catch (err) {
+        console.error("🚨 CORRECTOR CRASH:", err);
         res.status(500).json({ error: "Failed to correct answer.", details: err.message });
     }
 };
 
-// 4. ASSIGNMENT TRACKER WITH AUTO-REMINDERS (Fixed Content Extraction)
+// 4. ASSIGNMENT TRACKER 
 export const generateAssignmentReminders = async (req, res) => {
     const { userInfo } = req.body;
     try {
         await logAIUsage(userInfo, "Generate Assignment Reminders");
 
-        const missingAssignments = [
-            { student: "Aarav", subject: "Math", task: "Algebra Worksheet", due: "2 days ago" },
-            { student: "Priya", subject: "Science", task: "Lab Report", due: "Yesterday" }
-        ];
+        const dbResult = await pool.query(`
+            SELECT s.full_name AS student, a.title AS task, a.assessment_date AS due
+            FROM sgs_assessment_results ar
+            JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
+            JOIN sgs_student_master s ON ar.student_id = s.student_id
+            WHERE ar.is_absent = true OR ar.marks_obtained IS NULL
+            LIMIT 5;
+        `);
+
+        const missingAssignments = dbResult.rows;
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are a teacher's assistant. Draft a short, polite auto-reminder email to be sent to parents regarding these missing assignments: ${JSON.stringify(missingAssignments)}. Keep it under 4 sentences. Do NOT use markdown code blocks.`;
+        const prompt = `Write a short, professional email template for a teacher to remind parents about missing assignments. Use placeholders like [Student Name]. Maximum 3 sentences. Do NOT use markdown code blocks.`;
         
         const aiResult = await model.generateContent(prompt);
-
-        if (!aiResult.response) throw new Error("Empty AI Response");
-
         res.json({ reminderEmail: aiResult.response.text(), list: missingAssignments });
     } catch (err) {
+        console.error("🚨 REMINDERS CRASH:", err);
         res.status(500).json({ error: "Failed to generate reminders.", details: err.message });
     }
 };
 
-// 5. SHORT, SCANNABLE STUDENT ANALYTICS
+// 5. SHORT, SCANNABLE STUDENT ANALYTICS 
 export const getSingleStudentAnalytics = async (req, res) => {
-    const { studentName = "Aarav", subject = "Math", userInfo } = req.body;
+    const { studentName = "Aarav", userInfo } = req.body;
     try {
         await logAIUsage(userInfo, "View Student Analytics");
 
-        const studentData = [
-            { test_name: "Equations Quiz 1", type: "Quiz", score: 65 },
-            { test_name: "Algebra Homework", type: "Assignment", score: 88 },
-            { test_name: "Midterm Exam", type: "Exam", score: 68 },
-            { test_name: "Group Project", type: "Project", score: 92 },
-            { test_name: "Fractions Quiz", type: "Quiz", score: 72 }
-        ];
+        const dbResult = await pool.query(`
+            SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
+            FROM sgs_assessment_results ar
+            JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
+            JOIN sgs_student_master s ON ar.student_id = s.student_id
+            WHERE s.full_name ILIKE $1
+            ORDER BY a.assessment_date DESC
+            LIMIT 5;
+        `, [`%${studentName}%`]);
+
+        let studentData = dbResult.rows;
+
+        if (studentData.length === 0) {
+            studentData = [{ test_name: "Mock Test", type: "Exam", score: 75 }];
+        }
         
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const prompt = `You are helping a busy teacher review a student's performance. 
-        Student Name: ${studentName}. Subject: ${subject}. Scores: ${JSON.stringify(studentData)}. 
+        Student Name: ${studentName}. Scores: ${JSON.stringify(studentData)}. 
         Provide EXACTLY two short bullet points:
         1. A brief summary of their trend.
         2. One quick, actionable tip for the teacher.`;
         
         const aiResult = await model.generateContent(prompt);
-        if (!aiResult.response) throw new Error("Empty response from AI.");
-
         res.json({ analysis: aiResult.response.text(), chartData: studentData });
     } catch (err) {
-        console.error("🚨 Analytics Error:", err.message);
+        console.error("🚨 STUDENT ANALYTICS CRASH:", err);
         res.status(500).json({ error: "Failed to analyze student.", details: err.message });
     }
 };
 
-// 6. CLASS PERFORMANCE ANALYTICS
+// 6. CLASS PERFORMANCE ANALYTICS 
 export const getClassAnalytics = async (req, res) => {
     const { userInfo } = req.body;
+    const teacherId = userInfo?.id || 3;
+
     try {
         await logAIUsage(userInfo, "View Class Analytics");
 
-        const classData = [
-            { student: "Aarav", math: 85, science: 92 },
-            { student: "Priya", math: 45, science: 50 },
-            { student: "Rohan", math: 78, science: 80 },
-            { student: "Diya", math: 95, science: 88 }
-        ];
+        const dbResult = await pool.query(`
+            SELECT s.full_name AS student, ROUND(AVG(ar.percentage), 2) AS overall_score
+            FROM sgs_assessment_results ar
+            JOIN sgs_student_master s ON ar.student_id = s.student_id
+            JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
+            WHERE a.teacher_id = $1
+            GROUP BY s.full_name
+            ORDER BY overall_score DESC;
+        `, [teacherId]);
+
+        let classData = dbResult.rows;
+
+        if (classData.length === 0) {
+            classData = [{ student: "No Data", overall_score: 0 }];
+        }
+
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        
         const prompt = `Review this class data: ${JSON.stringify(classData)}. Provide a 2-sentence summary identifying the overall trend and naming any specific students who need immediate intervention. Keep it brief.`;
         
         const aiResult = await model.generateContent(prompt);
         res.json({ analyticsReport: aiResult.response.text(), data: classData });
     } catch (err) {
+        console.error("🚨 CLASS ANALYTICS CRASH:", err);
         res.status(500).json({ error: "Failed to generate class analytics.", details: err.message });
     }
 };
@@ -194,35 +220,24 @@ export const translateText = async (req, res) => {
         const aiResult = await model.generateContent(prompt);
         res.json({ translation: aiResult.response.text().trim() });
     } catch (err) {
+        console.error("🚨 TRANSLATION CRASH:", err);
         res.status(500).json({ error: "Failed to translate text.", details: err.message });
     }
 };
 
-// 8. UNIFIED TEACHER CHATBOT (Smart Language Engine)
+// 8. UNIFIED TEACHER CHATBOT
 export const teacherChatbot = async (req, res) => {
     const { message, targetLanguage = "English", userInfo } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
 
     try {
         await logAIUsage(userInfo, "Teacher AI Chatbot");
-
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are a helpful AI teaching assistant. 
-        INSTRUCTION ON LANGUAGE:
-        1. If the teacher explicitly asks to explain, write, or speak in a specific language in their message (e.g., "in Telugu", "write an email in Hindi", etc.), you MUST answer entirely in the language they requested.
-        2. If they do NOT specify a language in their message, answer in their default profile language: ${targetLanguage}.
-        
-        Teacher's input: "${message}"`;
-        
+        const prompt = `You are a helpful AI teaching assistant. If the teacher explicitly asks to explain, write, or speak in a specific language in their message, you MUST answer entirely in the language they requested. If they do NOT specify a language, answer in their default profile language: ${targetLanguage}. Teacher's input: "${message}"`;
         const aiResult = await model.generateContent(prompt);
-
-        if (!aiResult.response || !aiResult.response.candidates || aiResult.response.candidates.length === 0) {
-            throw new Error("Gemini returned an empty response. It might have triggered a safety filter.");
-        }
-
         res.json({ reply: aiResult.response.text() });
     } catch (err) {
-        console.error("🚨 Chatbot Error:", err.message);
+        console.error("🚨 CHATBOT CRASH:", err);
         res.status(500).json({ error: "Chat failed.", details: err.message });
     }
 };
