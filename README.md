@@ -1,6 +1,4 @@
-# 🎓 Edutech LLM Integration Project
-
-This repository contains the **SGS School AI Dashboards**. The platform provides tailored, data-driven interfaces for Students, Parents, Teachers, Headmasters, and Admin, bridging a live PostgreSQL (RDS) database with Google's Gemini API to deliver contextual, real-time educational insights.
+# 🎓SGS AI Integration 
 
 ---
 
