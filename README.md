@@ -52,6 +52,18 @@
 
 ---
 
+## 🗄️ Database Schema Requirements
+
+| Table Name | Purpose |
+| :--- | :--- |
+| `ai_usage_logs` | Tracks every AI interaction for usage monitoring. |
+| `ai_chat_messages` | Stores persistent conversation history for context-aware AI support. |
+| `sgs_chapter_content` | The "Knowledge Base" containing curriculum-aligned textbook text. |
+| `sgs_assessment_results` | Links assessments to students with percentage scores. |
+| `sgs_parent_student_map` | Bridges parent accounts to student performance data for secure access. |
+
+---
+
 ## 🚀 Setup & Installation
 
 ### 1. Repository Clone
