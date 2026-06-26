@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Helper Function: Logs AI Usage to the Database
 const logAIUsage = async (userInfo = {}, featureUsed) => {
@@ -52,19 +50,38 @@ export const getAssignmentReport = async (req, res) => {
             ];
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const prompt = `
-            You are an AI school assistant giving a quick update to a parent. 
-            Assignment data: ${JSON.stringify(assignments)}.
-            
-            Provide EXACTLY two short bullet points:
-            1. Praise for what the student has completed.
-            2. A polite, direct heads-up about what is missing or due soon.
-            Keep it incredibly brief. Do not use Markdown code blocks.
-        `;
+You are SGS AI Parent Assistant.
+
+Review the following assignment information.
+
+Assignment Data
+
+${JSON.stringify(assignments)}
+
+Generate a concise parent update.
+
+Include:
+
+• Positive progress made by the student.
+• Missing or overdue assignments.
+• Upcoming work requiring attention.
+
+IMPORTANT FORMAT RULES
+
+- Maximum 3 bullet points.
+- Use encouraging language.
+- Do not use Markdown tables.
+- Do not use Markdown code blocks.
+- Do not use HTML.
+- Do not use ASCII diagrams.
+- Do not use LaTeX.
+- Do not use $ or $$.
+- Use plain text only.
+`;
 
         const aiResult = await model.generateContent(prompt);
-        res.json({ report: aiResult.response.text(), list: assignments });
+        res.json({ report: aiResult.text, list: assignments });
     } catch (err) {
         console.error("🚨 ASSIGNMENT REPORT CRASH:", err);
         res.status(500).json({ error: "Failed to generate assignment report", details: err.message });
@@ -119,19 +136,38 @@ export const getParentAnalytics = async (req, res) => {
             ? `Analyze the student's progress in ${subject}.`
             : `Analyze the student's overall academic progress across all subjects.`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const prompt = `
-            You are an AI Progress Tracker assistant talking to a parent. ${promptContext} 
-            Data: ${JSON.stringify(mockData)}.
-            
-            Provide EXACTLY two short bullet points:
-            1. A summary of their current academic trend.
-            2. One specific, actionable tip the parent can do at home to support their child.
-            Keep it highly scannable and encouraging. Do not use Markdown code blocks.
-        `;
+You are SGS AI Parent Progress Assistant.
+
+${promptContext}
+
+Student Performance Data
+
+${JSON.stringify(mockData)}
+
+Generate a parent-friendly report.
+
+Include
+
+• Overall academic progress.
+• Strongest subject.
+• Subject needing improvement (if any).
+• One practical suggestion for parents to support learning at home.
+
+IMPORTANT FORMAT RULES
+
+- Maximum 4 bullet points.
+- Use simple language.
+- Keep the tone encouraging.
+- Do not use Markdown.
+- Do not use HTML.
+- Do not use LaTeX.
+- Do not use $.
+- Plain text only.
+`;
 
         const aiResult = await model.generateContent(prompt);
-        res.status(200).json({ analysis: aiResult.response.text(), chartData: mockData });
+        res.status(200).json({ analysis: aiResult.text, chartData: mockData });
 
     } catch (err) {
         console.error("🚨 PARENT ANALYTICS CRASH:", err);
@@ -142,7 +178,7 @@ export const getParentAnalytics = async (req, res) => {
             : [ { subject: "Math", score: 88 }, { subject: "Science", score: 92 }, { subject: "English", score: 78 }, { subject: "History", score: 85 } ];
 
         res.status(200).json({ 
-            analysis: "🚨 **Service Notice:** The AI is currently busy, but you can still review the chart data below.", 
+            analysis: "Service Notice: The AI assistant is temporarily unavailable. The academic performance charts below are still available for review.",
             chartData: fallbackData 
         });
     }
@@ -158,12 +194,27 @@ export const translateForParent = async (req, res) => {
     try {
         await logAIUsage(userInfo, "Parent Translator");
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `CRITICAL INSTRUCTION: You MUST generate your ENTIRE response in the ${targetLanguage} language. Do not use English unless requested.
-        Translate this school communication into ${targetLanguage}: "${text}". Return ONLY the translation, nothing else.`;
-        
+        const prompt = `
+Translate the following school communication into ${targetLanguage}.
+
+Requirements
+
+- Return ONLY the translated text.
+- Do not explain the translation.
+- Do not add quotation marks.
+- Preserve bullet points.
+- Preserve names.
+- Preserve dates.
+- Do not use Markdown.
+- Do not use HTML.
+
+School Communication
+
+"${text}"
+`;
+
         const aiResult = await model.generateContent(prompt);
-        res.json({ translation: aiResult.response.text().trim() });
+        res.json({ translation: aiResult.text.trim() });
     } catch (err) {
         console.error("🚨 TRANSLATOR CRASH:", err);
         res.status(500).json({ error: "Translation failed", details: err.message });

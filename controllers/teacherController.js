@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Helper Function: Logs AI Usage to the Database
 const logAIUsage = async (userInfo = {}, featureUsed) => {
@@ -32,13 +30,47 @@ export const generateLessonPlan = async (req, res) => {
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const { chapter_name, full_text_content } = result.rows[0];
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are an expert curriculum developer. Create a highly structured, ${durationMinutes}-minute lesson plan for a teacher covering the chapter "${chapter_name}". Base the lesson plan entirely on this textbook content: "${full_text_content}". Use this exact structure: 1. **Learning Objectives** 2. **Materials Needed** 3. **Introduction** 4. **Main Activity** 5. **Conclusion & Assessment**. Format beautifully. Do not use Markdown code blocks.`;
-        
-        const aiResult = await model.generateContent(prompt);
-        const lessonPlanText = aiResult.response.text();
 
-        // Save the generated plan to the RDS schema
+        const prompt = `
+You are an expert curriculum developer and senior school teacher.
+
+Create a detailed ${durationMinutes}-minute lesson plan for the chapter:
+
+"${chapter_name}"
+
+Use ONLY the following textbook content:
+
+"${full_text_content}"
+
+The lesson plan must contain:
+
+1. Learning Objectives
+2. Prerequisite Knowledge
+3. Materials Required
+4. Lesson Introduction
+5. Step-by-Step Teaching Activities
+6. Classroom Interaction Questions
+7. Practical Examples
+8. Assessment Questions
+9. Homework
+10. Conclusion
+
+IMPORTANT FORMAT RULES
+
+- Use clear headings.
+- Use bullet points where appropriate.
+- Never use Markdown tables.
+- Never use Markdown code blocks.
+- Never use HTML.
+- Never use ASCII diagrams.
+- Never use LaTeX.
+- Never use $ or $$.
+- Keep the language professional and teacher-friendly.
+`;
+
+        const aiResult = await model.generateContent(prompt);
+        const lessonPlanText = aiResult.text;
+
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
@@ -64,19 +96,47 @@ export const generateQuestionPaper = async (req, res) => {
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const content = result.rows[0].full_text_content;
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         
-        const prompt = `You are an expert exam setter. Read the following textbook content and generate a ${difficulty}-level question paper. 
-        CRITICAL REQUIREMENT: The total sum of the marks for all questions MUST add up to exactly ${totalMarks} marks.
-        
-        You MUST return ONLY a raw JSON object. Do not add conversational text or markdown backticks. Format exactly like this: 
-        { "paperTitle": "Unit Test: Chapter 1", "totalMarks": ${totalMarks}, "questions": [ { "type": "Short Answer", "question": "Explain...", "marks": 2, "rubric": "1 mark for definition, 1 mark for example." } ] } 
-        Text content to analyze: "${content}"`;
+        const prompt = `
+You are an experienced examination paper setter.
+
+Generate a ${difficulty} level question paper.
+
+The total marks MUST equal exactly ${totalMarks}.
+
+Generate a balanced paper with:
+- MCQs
+- Short Answer
+- Long Answer
+- Application Based Questions
+
+Return ONLY valid JSON.
+
+Do NOT return markdown.
+
+Do NOT use backticks.
+
+Do NOT explain the JSON.
+
+Do NOT use LaTeX.
+
+Do NOT use $.
+
+Return exactly this structure:
+
+{
+  "paperTitle":"",
+  "totalMarks":${totalMarks},
+  "questions":[]
+}
+
+Chapter Content
+
+"${content}"
+`;
         
         const aiResult = await model.generateContent(prompt);
-        let rawText = aiResult.response.text();
-        
-        let cleanedText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
 
@@ -95,11 +155,45 @@ export const autoCorrectAnswer = async (req, res) => {
     try {
         await logAIUsage(userInfo, "Grade Sample Answer");
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are a strict but fair teacher grading a student's answer. Question: "${question}" Maximum Marks: ${maxMarks} Teacher's Grading Rubric: "${rubric}" Student's Answer: "${studentAnswer}". Analyze the student's answer against the rubric. You MUST return ONLY a raw JSON object. Do not add markdown backticks. Format exactly like this: { "awardedMarks": 1.5, "feedback": "You correctly defined the concept, but missed the second part." }`;
-        
+        const prompt = `
+You are an experienced school examiner.
+
+Question
+
+"${question}"
+
+Maximum Marks
+
+${maxMarks}
+
+Teacher Rubric
+
+"${rubric}"
+
+Student Answer
+
+"${studentAnswer}"
+
+Evaluate fairly.
+
+Award partial marks where appropriate.
+
+Return ONLY valid JSON.
+
+Do NOT return markdown.
+
+Do NOT use backticks.
+
+Return
+
+{
+   "awardedMarks":0,
+   "feedback":"..."
+}
+`;
+
         const aiResult = await model.generateContent(prompt);
-        let cleanedText = aiResult.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         
         res.json(JSON.parse(jsonMatch[0]));
@@ -109,7 +203,7 @@ export const autoCorrectAnswer = async (req, res) => {
     }
 };
 
-// 4. ASSIGNMENT TRACKER 
+// 4. ASSIGNMENT DUE DATE ALERTS (Missing/Pending Tracker)
 export const generateAssignmentReminders = async (req, res) => {
     const { userInfo } = req.body;
     try {
@@ -125,117 +219,388 @@ export const generateAssignmentReminders = async (req, res) => {
         `);
 
         const missingAssignments = dbResult.rows;
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Write a short, professional email template for a teacher to remind parents about missing assignments. Use placeholders like [Student Name]. Maximum 3 sentences. Do NOT use markdown code blocks.`;
-        
+
+        const prompt = `
+Write a professional email reminder for parents.
+
+Requirements
+
+- Maximum 3 short paragraphs.
+- Friendly.
+- Professional.
+- Encouraging.
+- Mention assignment submission politely.
+- Use placeholder [Student Name].
+- Use placeholder [Assignment Name].
+
+Do not use markdown.
+
+Do not use HTML.
+
+Do not use code blocks.
+`;
+
         const aiResult = await model.generateContent(prompt);
-        res.json({ reminderEmail: aiResult.response.text(), list: missingAssignments });
+        res.json({ reminderEmail: aiResult.text, list: missingAssignments });
     } catch (err) {
-        console.error("🚨 REMINDERS CRASH:", err);
+        console.error("🚨 DUE DATE ALERTS CRASH:", err);
         res.status(500).json({ error: "Failed to generate reminders.", details: err.message });
     }
 };
 
-// 5. SHORT, SCANNABLE STUDENT ANALYTICS 
-export const getSingleStudentAnalytics = async (req, res) => {
-    const { studentName = "Aarav", userInfo } = req.body;
-    try {
-        await logAIUsage(userInfo, "View Student Analytics");
+// 5. ASSIGNMENT COMPLETION ALERTS (New Feature)
+export const getAssignmentCompletionAlerts = async (req, res) => {
+    const { userInfo } = req.body;
+    const teacherId = userInfo?.id || 3;
 
+    try {
+        await logAIUsage(userInfo, "View Completion Alerts");
+
+        // Query database for submitted assignments and calculate completion metrics
         const dbResult = await pool.query(`
+            SELECT a.title AS task, COUNT(ar.student_id) as total_submitted, ROUND(AVG(ar.percentage), 2) as avg_score
+            FROM sgs_assessment_results ar
+            JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
+            WHERE a.teacher_id = $1 AND ar.marks_obtained IS NOT NULL
+            GROUP BY a.title
+            ORDER BY a.assessment_date DESC
+            LIMIT 5;
+        `, [teacherId]);
+
+        const completions = dbResult.rows;
+
+        const prompt = `
+You are an AI teaching assistant.
+
+Review the following assignment statistics.
+
+${JSON.stringify(completions)}
+
+Generate a short report.
+
+Include:
+
+- Submission trend
+- Average performance
+- Students requiring attention
+
+Maximum 3 bullet points.
+
+No markdown.
+
+No HTML.
+
+No LaTeX.
+
+Plain text only.
+`;
+        
+        const aiResult = await model.generateContent(prompt);
+        res.json({ completionAlert: aiResult.text, data: completions });
+    } catch (err) {
+        console.error("🚨 COMPLETION ALERTS CRASH:", err);
+        res.status(500).json({ error: "Failed to fetch completion alerts.", details: err.message });
+    }
+};
+
+// 6. VIRTUAL SLATE AI PROCESSOR 
+export const processVirtualSlateContent = async (req, res) => {
+    const { rawText, action = "format", userInfo } = req.body;
+    
+    if (!rawText) return res.status(400).json({ error: "Virtual slate text is required." });
+
+    try {
+        await logAIUsage(userInfo, `Virtual Slate: ${action}`);
+        
+        let instruction = action === "summarize" 
+            ? "Summarize these rough virtual slate notes clearly." 
+            : "Format these rough virtual slate notes into clean, structured bullet points for students.";
+            
+        const prompt = `
+You are an AI classroom assistant.
+
+Teacher's rough notes:
+
+"${rawText}"
+
+Task
+
+${instruction}
+
+Formatting Rules
+
+- Create clean notes.
+- Use headings.
+- Use bullet points.
+- Do not use markdown code blocks.
+- Do not use HTML.
+- Do not use ASCII art.
+- Do not use LaTeX.
+- Do not use $.
+- Make notes suitable for classroom teaching.
+`;
+
+        const aiResult = await model.generateContent(prompt);
+        res.json({ processedContent: aiResult.text });
+    } catch (err) {
+        console.error("🚨 VIRTUAL SLATE CRASH:", err);
+        res.status(500).json({ error: "Failed to process virtual slate.", details: err.message });
+    }
+};
+
+// 7 & 8. STUDENT ANALYTICS
+export const getSingleStudentAnalytics = async (req, res) => {
+    const { studentName = "Aarav", subject = "all", userInfo } = req.body;
+    try {
+        await logAIUsage(userInfo, `View Student Analytics (${subject})`);
+
+        let query = `
             SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
             FROM sgs_assessment_results ar
             JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
             JOIN sgs_student_master s ON ar.student_id = s.student_id
             WHERE s.full_name ILIKE $1
-            ORDER BY a.assessment_date DESC
-            LIMIT 5;
-        `, [`%${studentName}%`]);
+        `;
+        let params = [`%${studentName}%`];
+
+        if (subject !== "all") {
+            query += ` AND a.assessment_type ILIKE $2`;
+            params.push(`%${subject}%`);
+        }
+
+        query += ` ORDER BY a.assessment_date DESC LIMIT 5;`;
+        const dbResult = await pool.query(query, params);
 
         let studentData = dbResult.rows;
-
         if (studentData.length === 0) {
             studentData = [{ test_name: "Mock Test", type: "Exam", score: 75 }];
         }
         
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are helping a busy teacher review a student's performance. 
-        Student Name: ${studentName}. Scores: ${JSON.stringify(studentData)}. 
-        Provide EXACTLY two short bullet points:
-        1. A brief summary of their trend.
-        2. One quick, actionable tip for the teacher.`;
-        
+        const prompt = `
+You are helping a teacher analyse student performance.
+
+Student Name
+
+${studentName}
+
+Performance Data
+
+${JSON.stringify(studentData)}
+
+Generate
+
+1. Overall Performance
+2. Strengths
+3. Weaknesses
+4. One Recommendation
+
+Maximum 4 bullet points.
+
+Plain text only.
+
+No markdown.
+
+No HTML.
+
+No LaTeX.
+
+No $ symbols.
+`;
+
         const aiResult = await model.generateContent(prompt);
-        res.json({ analysis: aiResult.response.text(), chartData: studentData });
+        res.json({ analysis: aiResult.text, chartData: studentData });
     } catch (err) {
         console.error("🚨 STUDENT ANALYTICS CRASH:", err);
         res.status(500).json({ error: "Failed to analyze student.", details: err.message });
     }
 };
 
-// 6. CLASS PERFORMANCE ANALYTICS 
+// 7 & 8. CLASS PERFORMANCE ANALYTICS
 export const getClassAnalytics = async (req, res) => {
-    const { userInfo } = req.body;
+    const { subject = "all", userInfo } = req.body;
     const teacherId = userInfo?.id || 3;
 
     try {
-        await logAIUsage(userInfo, "View Class Analytics");
+        await logAIUsage(userInfo, `View Class Analytics (${subject})`);
 
-        const dbResult = await pool.query(`
+        let query = `
             SELECT s.full_name AS student, ROUND(AVG(ar.percentage), 2) AS overall_score
             FROM sgs_assessment_results ar
             JOIN sgs_student_master s ON ar.student_id = s.student_id
             JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
             WHERE a.teacher_id = $1
-            GROUP BY s.full_name
-            ORDER BY overall_score DESC;
-        `, [teacherId]);
+        `;
+        let params = [teacherId];
+
+        if (subject !== "all") {
+            query += ` AND a.assessment_type ILIKE $2`;
+            params.push(`%${subject}%`);
+        }
+
+        query += ` GROUP BY s.full_name ORDER BY overall_score DESC;`;
+        const dbResult = await pool.query(query, params);
 
         let classData = dbResult.rows;
-
         if (classData.length === 0) {
             classData = [{ student: "No Data", overall_score: 0 }];
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Review this class data: ${JSON.stringify(classData)}. Provide a 2-sentence summary identifying the overall trend and naming any specific students who need immediate intervention. Keep it brief.`;
-        
+        const prompt = `
+You are analysing an entire classroom.
+
+Data
+
+${JSON.stringify(classData)}
+
+Generate
+
+- Overall class performance
+- Strong performers
+- Students needing attention
+- Teaching recommendation
+
+Maximum 5 bullet points.
+
+Plain text only.
+
+No markdown.
+
+No HTML.
+
+No LaTeX.
+
+No $.
+`;
+    
         const aiResult = await model.generateContent(prompt);
-        res.json({ analyticsReport: aiResult.response.text(), data: classData });
+        res.json({ analyticsReport: aiResult.text, data: classData });
     } catch (err) {
         console.error("🚨 CLASS ANALYTICS CRASH:", err);
         res.status(500).json({ error: "Failed to generate class analytics.", details: err.message });
     }
 };
 
-// 7. LANGUAGE TRANSLATOR
+// 9 & 10. LANGUAGE TRANSLATOR 
 export const translateText = async (req, res) => {
     const { text, targetLanguage, userInfo } = req.body;
     if (!text || !targetLanguage) return res.status(400).json({ error: "Text and target language required" });
 
     try {
         await logAIUsage(userInfo, "Translate Text");
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Translate the following text into ${targetLanguage}. Return ONLY the translated text, nothing else.\n\nText: "${text}"`;
+        
+        const prompt = `
+Translate the following text into ${targetLanguage}.
+
+Requirements
+
+- Return ONLY the translated text.
+- Do not explain.
+- Do not add quotation marks.
+- Preserve formatting.
+- Preserve bullet points if present.
+- Do not use markdown.
+
+Text
+
+"${text}"
+`;
+        
         const aiResult = await model.generateContent(prompt);
-        res.json({ translation: aiResult.response.text().trim() });
+        res.json({ translation: aiResult.text.trim() });
     } catch (err) {
         console.error("🚨 TRANSLATION CRASH:", err);
         res.status(500).json({ error: "Failed to translate text.", details: err.message });
     }
 };
 
-// 8. UNIFIED TEACHER CHATBOT
+// 11. UNIFIED TEACHER CHATBOT (UPGRADED WITH MEMORY AND NATIVE SCRIPT RULES)
 export const teacherChatbot = async (req, res) => {
     const { message, targetLanguage = "English", userInfo } = req.body;
+    
+    // Use the user's ID to fetch their specific chat history
+    const userId = userInfo?.id || 3; 
+
     if (!message) return res.status(400).json({ error: "Message is required" });
 
     try {
         await logAIUsage(userInfo, "Teacher AI Chatbot");
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `You are a helpful AI teaching assistant. If the teacher explicitly asks to explain, write, or speak in a specific language in their message, you MUST answer entirely in the language they requested. If they do NOT specify a language, answer in their default profile language: ${targetLanguage}. Teacher's input: "${message}"`;
-        const aiResult = await model.generateContent(prompt);
-        res.json({ reply: aiResult.response.text() });
+
+        // 1. Fetch the last 10 messages from the database to build "Memory"
+        const historyResult = await pool.query(
+            `SELECT role, message_content FROM (
+                SELECT role, message_content, created_at 
+                FROM ai_chat_messages 
+                WHERE student_id = $1 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            ) sub ORDER BY created_at ASC`,
+            [userId]
+        );
+
+        // Format history exactly how Gemini expects it
+        const chatHistory = historyResult.rows.map(row => ({
+            role: row.role === 'ai' ? 'model' : 'user', 
+            parts: [{ text: row.message_content }]
+        }));
+
+        // 2. Initialize Gemini with STRICT Language & Script Rules
+        const prompt = `
+You are SGS AI Teacher Assistant.
+
+You help teachers with
+
+- Lesson Planning
+- Question Papers
+- Student Assessment
+- Classroom Management
+- Curriculum Design
+- Translation
+- Parent Communication
+
+Current Conversation History
+
+${history}
+
+Teacher's latest question
+
+${message}
+
+IMPORTANT RESPONSE RULES
+
+- Respond in ${targetLanguage}.
+- Be concise but complete.
+- Never use Markdown tables.
+- Never use Markdown code blocks.
+- Never use HTML.
+- Never use ASCII diagrams.
+- Never use LaTeX.
+- Never use $ or $$.
+- Write mathematical expressions in plain text.
+- Use headings and bullet points where helpful.
+`;
+
+        // 3. Start the Chat Session using the historical memory
+        const chat = model.startChat({
+            history: chatHistory
+        });
+
+        // 4. Save the user's NEW message to the database
+        await pool.query(
+            `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            [userId, 'user', message]
+        );
+
+        // 5. Send the message to Gemini
+        const aiResult = await chat.sendMessage(message);
+        const aiReply = aiResult.text;
+
+        // 6. Save the AI's reply back to the database
+        await pool.query(
+            `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            [userId, 'ai', aiReply]
+        );
+
+        res.json({ reply: aiReply });
     } catch (err) {
         console.error("🚨 CHATBOT CRASH:", err);
         res.status(500).json({ error: "Chat failed.", details: err.message });

@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Helper Function: Logs AI Usage to the Database
 const logAIUsage = async (userInfo = {}, featureUsed) => {
@@ -16,6 +14,19 @@ const logAIUsage = async (userInfo = {}, featureUsed) => {
     } catch (err) {
         console.error("Failed to log AI usage to database:", err);
     }
+};
+
+const cleanAIText = (text) => {
+    return text
+        .replace(/\$\$/g, "")
+        .replace(/\$/g, "")
+        .replace(/\\\(/g, "")
+        .replace(/\\\)/g, "")
+        .replace(/\\\[/g, "")
+        .replace(/\\\]/g, "")
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
 };
 
 // ==========================================
@@ -38,24 +49,52 @@ export const getAssignmentReport = async (req, res) => {
         let reportData = dbResult.rows[0];
 
         // Fallback if DB is completely empty
-        if (reportData.total_assigned == 0) {
+        if (Number(reportData.total_assigned) === 0) {
             reportData = { total_assigned: 1200, completed: 950, missing: 250 };
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Act as an executive AI for a Headmaster. Summarize this school-wide assignment data: ${JSON.stringify(reportData)}. Write a 3-bullet executive summary highlighting completion rates and identifying areas that need administrative intervention. Do not use markdown code blocks.`;
-        
+        const prompt = `
+You are SGS AI Executive Assistant for the Headmaster.
+
+Review the following school-wide assignment statistics.
+
+School Data
+
+${JSON.stringify(reportData)}
+
+Prepare a concise executive report.
+
+Include:
+
+• Overall completion status.
+• Key concerns requiring intervention.
+• Recommended administrative action.
+
+IMPORTANT FORMAT RULES
+
+- Maximum 3 bullet points.
+- Professional tone.
+- No Markdown.
+- No Markdown tables.
+- No Markdown code blocks.
+- No HTML.
+- No ASCII diagrams.
+- No LaTeX.
+- No $ or $$.
+- Plain text only.
+`;
+         
         const aiResult = await model.generateContent(prompt);
-        res.json({ report: aiResult.response.text() });
+        res.json({ report: cleanAIText(aiResult.text)});
     } catch (err) {
         console.error("🚨 HEADMASTER ASSIGNMENT CRASH:", err);
         res.status(500).json({ error: "Failed to generate assignment report", details: err.message });
     }
 };
 
-// ==========================================
+
 // 2, 3, 4, 5. UNIFIED ACADEMIC ANALYTICS ENGINE (From DB)
-// ==========================================
+
 export const getAcademicAnalytics = async (req, res) => {
     const { targetName, targetType, scope, userInfo } = req.body; 
     
@@ -109,13 +148,43 @@ export const getAcademicAnalytics = async (req, res) => {
             promptContext = `Analyze the overall cohort performance of class ${targetName} across ALL subjects.`;
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Act as an AI Principal. ${promptContext} Data: ${JSON.stringify(mockData)}. Write a concise, highly scannable 1-paragraph executive summary of their trajectory. Do not use Markdown code blocks.`;
-        
+        const prompt = `
+You are SGS AI Academic Analytics Assistant.
+
+${promptContext}
+
+Academic Data
+
+${JSON.stringify(mockData)}
+
+Generate an executive academic report.
+
+Include:
+
+• Overall academic trend.
+• Key strengths.
+• Areas requiring intervention.
+• Recommendations for school leadership.
+
+IMPORTANT FORMAT RULES
+
+- Maximum 4 bullet points.
+- Plain text only.
+- No Markdown.
+- No HTML.
+- No ASCII diagrams.
+- No LaTeX.
+- No $.
+`;
+  
         const aiResult = await model.generateContent(prompt);
-        res.json({ analysis: aiResult.response.text(), chartData: mockData });
+        res.json({ analysis: cleanAIText(aiResult.text), chartData: mockData });
     } catch (err) {
-        console.error("🚨 HEADMASTER ANALYTICS CRASH:", err);
+        console.error("🚨 HEADMASTER ANALYTICS CRASH:", {
+    message: err.message,
+    status: err.status,
+    stack: err.stack
+});
         res.status(500).json({ error: "Failed to run academic analytics", details: err.message });
     }
 };
@@ -147,11 +216,37 @@ export const getTeacherPerformance = async (req, res) => {
             ];
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `Act as an AI HR Director. Analyze this teacher KPI data showing how many assessments they have created in the system: ${JSON.stringify(teacherData)}. Write a brief, bulleted review. Highlight top performers and suggest coaching for those with low engagement.`;
-        
+        const prompt = `
+You are SGS AI School Performance Advisor.
+
+Review the following teacher performance data.
+
+Teacher Data
+
+${JSON.stringify(teacherData)}
+
+Generate an executive summary.
+
+Include:
+
+• High-performing teachers.
+• Teachers requiring support.
+• Administrative recommendations.
+• Professional development suggestions.
+
+IMPORTANT FORMAT RULES
+
+- Maximum 4 bullet points.
+- Professional tone.
+- No Markdown.
+- No HTML.
+- No LaTeX.
+- No $.
+- Plain text only.
+`;
+ 
         const aiResult = await model.generateContent(prompt);
-        res.json({ report: aiResult.response.text() });
+        res.json({ report: cleanAIText(aiResult.text) });
     } catch (err) {
         console.error("🚨 TEACHER KPI CRASH:", err);
         res.status(500).json({ error: "Failed to generate teacher report", details: err.message });
@@ -163,14 +258,36 @@ export const getTeacherPerformance = async (req, res) => {
 // ==========================================
 export const translateForHeadmaster = async (req, res) => {
     const { text, targetLanguage, userInfo } = req.body;
-    if (!text || !targetLanguage) return res.status(400).json({ error: "Missing parameters" });
     
+    if (!text?.trim() || !targetLanguage?.trim()) {
+    return res.status(400).json({
+        error: "Missing parameters"
+    });
+}
+
     try {
         await logAIUsage(userInfo, "Headmaster Translator");
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const prompt = `CRITICAL INSTRUCTION: Generate your response entirely in ${targetLanguage}. Translate this official school communication into ${targetLanguage}: "${text}". Return ONLY the translation.`;
+        
+        const prompt = `
+Translate the following official school communication into ${targetLanguage}.
+
+Requirements
+
+- Return ONLY the translated text.
+- Preserve names.
+- Preserve dates.
+- Preserve formatting.
+- Do not explain the translation.
+- Do not use Markdown.
+- Do not use HTML.
+
+Official School Communication
+
+"${text}"
+`;
+
         const aiResult = await model.generateContent(prompt);
-        res.json({ translation: aiResult.response.text().trim() });
+        res.json({ translation: cleanAIText(aiResult.text)});
     } catch (err) {
         console.error("🚨 TRANSLATOR CRASH:", err);
         res.status(500).json({ error: "Translation failed", details: err.message });

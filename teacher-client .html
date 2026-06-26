@@ -14,7 +14,7 @@
         .dashboard-section { background: #ffffff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border-left: 5px solid #8e44ad;}
         h2 { color: #2c3e50; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .controls { display: flex; gap: 15px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;}
-        select, input[type="text"], input[type="number"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
+        select, input[type="text"], input[type="number"], textarea { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;}
         button { padding: 10px 20px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; color: white; cursor: pointer; background-color: #8e44ad; transition: 0.2s;}
         button:hover { opacity: 0.9; }
         button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.7; }
@@ -56,16 +56,38 @@
     </div>
 
     <div class="dashboard-section">
-        <h2>📅 Assignment Reminders</h2>
-        <button onclick="generateReminders(this)">Draft Reminders for Missing Work</button>
-        <div id="rem-loading" class="loading-spinner" style="display:none;">Drafting emails...</div>
+        <h2>🖍️ Virtual Slate AI Processor</h2>
+        <p style="font-size: 14px; color: #7f8c8d; margin-top: 0;">Type or dictate your rough class notes here, and let the AI instantly format them into structured study material.</p>
+        <textarea id="slate-text" rows="5" style="width: 100%; box-sizing: border-box; margin-bottom: 10px;" placeholder="Rough notes... e.g. Democracy means rule by people, comes from Greek word demos..."></textarea>
+        <div class="controls">
+            <button onclick="processSlate('format', this)">Format Notes</button>
+            <button onclick="processSlate('summarize', this)" class="btn-blue">Summarize Notes</button>
+        </div>
+        <div id="slate-loading" class="loading-spinner" style="display:none;">AI is processing slate content...</div>
+        <div id="slate-ws" class="output-box" style="display:none;"></div>
+    </div>
+
+    <div class="dashboard-section">
+        <h2>📅 Assignment Tracker Alerts</h2>
+        <div class="controls">
+            <button onclick="generateReminders(this)">Draft Reminders (Missing Work)</button>
+            <button onclick="getCompletionAlerts(this)" class="btn-blue">View Completion Alerts</button>
+        </div>
+        <div id="rem-loading" class="loading-spinner" style="display:none;">Processing alerts...</div>
         <div id="rem-ws" class="output-box" style="display:none;"></div>
     </div>
 
     <div class="dashboard-section">
         <h2>📈 Per Student Analytics</h2>
         <div class="controls">
-            <input type="text" id="stu-name" value="Aryan" placeholder="Student Name">
+            <input type="text" id="stu-name" value="Aarav" placeholder="Student Name">
+            <select id="stu-subject" style="font-weight: bold;">
+                <option value="all">All Subjects</option>
+                <option value="Math">Math</option>
+                <option value="Science">Science</option>
+                <option value="English">English</option>
+                <option value="History">History</option>
+            </select>
             <button onclick="loadStudentAnalytics(this)">Analyze Student</button>
         </div>
         <div id="stu-loading" class="loading-spinner" style="display:none;">Analyzing student history...</div>
@@ -77,7 +99,16 @@
 
     <div class="dashboard-section">
         <h2>📊 Class Performance Analytics</h2>
-        <button onclick="loadClassAnalytics(this)">Generate Class Report</button>
+        <div class="controls">
+            <select id="cls-subject" style="font-weight: bold;">
+                <option value="all">Overall (All Subjects)</option>
+                <option value="Math">Math Only</option>
+                <option value="Science">Science Only</option>
+                <option value="English">English Only</option>
+                <option value="History">History Only</option>
+            </select>
+            <button onclick="loadClassAnalytics(this)">Generate Class Report</button>
+        </div>
         <div id="ca-loading" class="loading-spinner" style="display: none;">Analyzing class averages...</div>
         <div id="ca-ws" class="analytics-container" style="display: none;">
             <div class="chart-container"><canvas id="classChart"></canvas></div>
@@ -110,8 +141,6 @@
                 <option value="Koya">Tribal - Koya</option>
                 <option value="Gondi">Tribal - Gondi</option>
                 <option value="Konda">Tribal - Konda</option>
-                <option value="French">French</option>
-                <option value="Spanish">Spanish</option>
             </select>
 
             <button id="chat-btn" class="btn-green" onclick="sendMessage()" style="padding: 0 25px;">Send</button>
@@ -145,7 +174,7 @@
 
     // Task 1: Lesson Plan
     async function generateLessonPlan(btn) {
-        if(btn) btn.disabled = true; // Disable button to prevent spam
+        if(btn) btn.disabled = true; 
         hideUI('core-ws', 'core-loading');
         try {
             const data = await fetchWithLog('/lesson-plan', { chapterId: 1 });
@@ -154,7 +183,7 @@
             document.getElementById('core-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
         } finally {
             showUI('core-ws', 'core-loading');
-            if(btn) btn.disabled = false; // Re-enable button
+            if(btn) btn.disabled = false;
         }
     }
 
@@ -211,14 +240,31 @@
         }
     }
 
-    // Task 4: REMINDERS 
+    // NEW Task: VIRTUAL SLATE PROCESSOR
+    async function processSlate(action, btn) {
+        const rawText = document.getElementById('slate-text').value.trim();
+        if(!rawText) return alert("Please enter some text on the virtual slate first.");
+        
+        if(btn) btn.disabled = true;
+        hideUI('slate-ws', 'slate-loading');
+        try {
+            const data = await fetchWithLog('/virtual-slate', { rawText, action });
+            document.getElementById('slate-ws').innerHTML = marked.parse(data.processedContent);
+        } catch(err) { 
+            document.getElementById('slate-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('slate-ws', 'slate-loading');
+            if(btn) btn.disabled = false;
+        }
+    }
+
+    // Task 4: REMINDERS (Missing Work)
     async function generateReminders(btn) {
         if(btn) btn.disabled = true;
         hideUI('rem-ws', 'rem-loading');
         try {
             const data = await fetchWithLog('/assignment-reminders', {});
-            
-            let displayHTML = marked.parse(data.reminderEmail);
+            let displayHTML = `<strong>Alert Generation:</strong><br>${marked.parse(data.reminderEmail)}`;
             if(data.list && data.list.length > 0) {
                 displayHTML += `<h4>Students Missing Work:</h4><ul>`;
                 data.list.forEach(item => displayHTML += `<li>${item.student} - ${item.task} (Due: ${item.due})</li>`);
@@ -233,19 +279,55 @@
         }
     }
 
-    // Task 5: STUDENT ANALYTICS
+    // NEW Task 5: COMPLETION ALERTS 
+    async function getCompletionAlerts(btn) {
+        if(btn) btn.disabled = true;
+        hideUI('rem-ws', 'rem-loading');
+        try {
+            const data = await fetchWithLog('/completion-alerts', {});
+            let displayHTML = `<strong>Completion Alert Summary:</strong><br>${marked.parse(data.completionAlert)}`;
+            if(data.data && data.data.length > 0) {
+                displayHTML += `<hr><h4>Recent Assignment Completions:</h4><ul>`;
+                data.data.forEach(item => displayHTML += `<li><strong>${item.task}</strong>: ${item.total_submitted} submitted (Avg Score: ${item.avg_score}%)</li>`);
+                displayHTML += `</ul>`;
+            }
+            document.getElementById('rem-ws').innerHTML = displayHTML;
+        } catch(err) { 
+            document.getElementById('rem-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
+        } finally {
+            showUI('rem-ws', 'rem-loading');
+            if(btn) btn.disabled = false;
+        }
+    }
+
+    // Task 6: STUDENT ANALYTICS (With Subject Filtering)
     let stuChart = null;
     async function loadStudentAnalytics(btn) {
         if(btn) btn.disabled = true;
         hideUI('stu-ws', 'stu-loading');
         try {
-            const data = await fetchWithLog('/student-analytics', { studentName: document.getElementById('stu-name').value });
+            const studentName = document.getElementById('stu-name').value;
+            const subject = document.getElementById('stu-subject').value;
+            
+            const data = await fetchWithLog('/student-analytics', { studentName, subject });
             document.getElementById('stu-report').innerHTML = marked.parse(data.analysis || "No analysis available.");
             
             if(data.chartData && Array.isArray(data.chartData)) {
                 const ctx = document.getElementById('stuChart').getContext('2d');
                 if(stuChart) stuChart.destroy();
-                stuChart = new Chart(ctx, { type: 'line', data: { labels: data.chartData.map(d=>d.test_name), datasets: [{ label: 'Score %', data: data.chartData.map(d=>d.score), borderColor: '#8e44ad', backgroundColor: 'rgba(142, 68, 173, 0.2)', fill: true}] }});
+                stuChart = new Chart(ctx, { 
+                    type: 'line', 
+                    data: { 
+                        labels: data.chartData.map(d=>d.test_name), 
+                        datasets: [{ 
+                            label: `Score % (${subject === 'all' ? 'All Subjects' : subject})`, 
+                            data: data.chartData.map(d=>d.score), 
+                            borderColor: '#8e44ad', 
+                            backgroundColor: 'rgba(142, 68, 173, 0.2)', 
+                            fill: true
+                        }] 
+                    }
+                });
             }
             document.getElementById('stu-ws').style.display='flex';
         } catch(err) { 
@@ -257,13 +339,14 @@
         }
     }
 
-    // Task 6: Class Analytics
+    // Task 7: CLASS ANALYTICS (With Subject Filtering)
     let classChart = null;
     async function loadClassAnalytics(btn) {
         if(btn) btn.disabled = true;
         hideUI('ca-ws', 'ca-loading');
         try {
-            const data = await fetchWithLog('/class-analytics', {});
+            const subject = document.getElementById('cls-subject').value;
+            const data = await fetchWithLog('/class-analytics', { subject });
             document.getElementById('ca-report').innerHTML = marked.parse(data.analyticsReport);
             
             if (data.data && Array.isArray(data.data)) {
@@ -273,7 +356,11 @@
                     type: 'bar', 
                     data: { 
                         labels: data.data.map(d => d.student), 
-                        datasets: [ { label: 'Overall Average %', data: data.data.map(d => d.overall_score), backgroundColor: '#3498db' } ] 
+                        datasets: [{ 
+                            label: `Average Score % (${subject === 'all' ? 'All Subjects' : subject})`, 
+                            data: data.data.map(d => d.overall_score), 
+                            backgroundColor: '#3498db' 
+                        }] 
                     }
                 });
             }
