@@ -557,9 +557,11 @@ You help teachers with
 - Translation
 - Parent Communication
 
-Current Conversation History
+Conversation History
 
-${history}
+${chatHistory
+    .map(chat => `${chat.role === "model" ? "Assistant" : "Teacher"}: ${chat.parts[0].text}`)
+    .join("\n")}
 
 Teacher's latest question
 
@@ -578,23 +580,18 @@ IMPORTANT RESPONSE RULES
 - Write mathematical expressions in plain text.
 - Use headings and bullet points where helpful.
 `;
-
-        // 3. Start the Chat Session using the historical memory
-        const chat = model.startChat({
-            history: chatHistory
-        });
-
-        // 4. Save the user's NEW message to the database
+    
+        // 3. Save the user's NEW message to the database
         await pool.query(
             `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'user', message]
         );
 
-        // 5. Send the message to Gemini
-        const aiResult = await chat.sendMessage(message);
+        // 4. Send the message to Gemini
+        const aiResult = await model.generateContent(prompt);
         const aiReply = aiResult.text;
 
-        // 6. Save the AI's reply back to the database
+        // 5. Save the AI's reply back to the database
         await pool.query(
             `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'ai', aiReply]
