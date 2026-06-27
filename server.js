@@ -12,7 +12,7 @@ import teacherRoutes from './routes/teacherRoutes.js';
 
 // ✅ UNCOMMENTED PARENT ROUTES
 import parentRoutes from './routes/parentRoutes.js';        
-// import headmasterRoutes from './routes/headmasterRoutes.js'; 
+import headmasterRoutes from './routes/headmasterRoutes.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,7 +32,7 @@ app.use('/api/v1/ai/teacher', teacherRoutes);
 
 // ✅ UNCOMMENTED PARENT DASHBOARD
 app.use('/api/v1/ai/parent', parentRoutes);         
-// app.use('/api/v1/ai/headmaster', headmasterRoutes); 
+app.use('/api/v1/ai/headmaster', headmasterRoutes); 
 
 // 🔍 DATABASE CONNECTION TEST
 pool.query('SELECT NOW()', (err, res) => {
