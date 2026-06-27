@@ -249,11 +249,3 @@ AI-integration-swais/
 | Chat Memory    | Persistent Database Storage |
 
 ---
-
-# 👩‍💻 Developer
-
-**Anushka Gupta**
-
-AI/ML Engineer
-
-**SGS AI Integration**
