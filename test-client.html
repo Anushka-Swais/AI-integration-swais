@@ -245,52 +245,76 @@
     }
 
     // --- VOICE & MULTILINGUAL CHATBOT ---
+    const languageCodes = {
+        "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+        "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+        "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+        "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
+        "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US"
+    };
+
     let recognition;
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
+        
         recognition.onresult = (e) => { 
             document.getElementById('chat-input').value += e.results[0][0].transcript + " "; 
             document.getElementById('dictate-btn').innerText = "🎙️"; 
             document.getElementById('dictate-btn').style.backgroundColor = "#e74c3c";
         };
+
+        recognition.onend = () => {
+            document.getElementById('dictate-btn').innerText = "🎙️"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#e74c3c";
+        };
     }
+
     function toggleDictation() { 
         if(recognition){ 
+            const selectedLang = document.getElementById('chat-lang').value;
+            recognition.lang = languageCodes[selectedLang] || "en-US";
+            
             document.getElementById('dictate-btn').innerText = "🔴"; 
             document.getElementById('dictate-btn').style.backgroundColor = "#2ecc71"; 
             recognition.start(); 
-        } else { alert("Speech recognition is not supported in this browser."); }
+        } else { 
+            alert("Speech recognition is not supported in this browser. Please use Chrome."); 
+        }
     }
 
-    function speakChat(btnElement) { 
+    async function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
         
         const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        
         const selectedLang = document.getElementById('chat-lang').value;
         
-        const languageCodes = {
-            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
-            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
-            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
-            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
-            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" // Tribal fallback
-        };
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "⏳ Loading Voice...";
+        btnElement.disabled = true;
 
-        const targetLangCode = languageCodes[selectedLang] || "en-US";
-        utterance.lang = targetLangCode;
+        try {
+            const res = await fetch(`${API_BASE}/speak`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: textToSpeak,
+                    language: selectedLang
+                })
+            });
 
-        const availableVoices = window.speechSynthesis.getVoices();
-        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "TTS failed");
 
-        if (!voiceFound && targetLangCode !== "en-US") {
-            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed!`);
-        } else if (voiceFound) {
-            utterance.voice = voiceFound;
+            const audioStream = new Audio("data:audio/mp3;base64," + data.audioData);
+            await audioStream.play();
+
+        } catch (err) {
+            console.error("Cloud TTS Playback Error:", err);
+            alert(`⚠️ Audio play nahi ho saka: ${err.message}`);
+        } finally {
+            btnElement.innerText = originalText;
+            btnElement.disabled = false;
         }
-
-        window.speechSynthesis.speak(utterance); 
     }
 
     window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };

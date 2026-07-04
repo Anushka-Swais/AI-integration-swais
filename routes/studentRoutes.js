@@ -3,7 +3,8 @@ import {
     handleStudentChat, 
     generateAutoQuiz, 
     getStudentAnalytics,
-    generatePacedContent 
+    generatePacedContent,
+    handleTextToSpeech // ADDED THIS IMPORT
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -19,5 +20,8 @@ router.post('/analytics', getStudentAnalytics);
 
 // 📖 Auto Content Generation based on Learning Pace
 router.post('/generate-content', generatePacedContent); 
+
+// 🔊 Google Cloud Text-to-Speech Endpoint (ADDED THIS ROUTE)
+router.post('/speak', handleTextToSpeech);
 
 export default router;
