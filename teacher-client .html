@@ -32,7 +32,7 @@
         .ai-msg { background: #ecf0f1; color: #2c3e50; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #dfe6e9;}
         .listen-btn { cursor: pointer; background: #2c3e50; border: none; font-size: 12px; font-weight: bold; padding: 5px 10px; color: white; border-radius: 4px; margin-top: 8px; display: inline-block;}
         .listen-btn:hover { background: #1a252f; transform: translateY(-1px);}
-        .mic-btn { border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 20px;}
+        .mic-btn { border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;}
     </style>
 </head>
 <body>
@@ -58,7 +58,12 @@
     <div class="dashboard-section">
         <h2>🖍️ Virtual Slate AI Processor</h2>
         <p style="font-size: 14px; color: #7f8c8d; margin-top: 0;">Type or dictate your rough class notes here, and let the AI instantly format them into structured study material.</p>
-        <textarea id="slate-text" rows="5" style="width: 100%; box-sizing: border-box; margin-bottom: 10px;" placeholder="Rough notes... e.g. Democracy means rule by people, comes from Greek word demos..."></textarea>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button id="slate-dictate-btn" class="btn-red mic-btn" onclick="toggleDictation('slate-text', 'slate-dictate-btn')" title="Click to speak into Slate">🎙️</button>
+            <textarea id="slate-text" rows="5" style="flex: 1; padding: 10px; box-sizing: border-box;" placeholder="Rough notes... e.g. Democracy means rule by people, comes from Greek word demos..."></textarea>
+        </div>
+
         <div class="controls">
             <button onclick="processSlate('format', this)">Format Notes</button>
             <button onclick="processSlate('summarize', this)" class="btn-blue">Summarize Notes</button>
@@ -124,7 +129,7 @@
             </div>
         </div>
         <div class="controls" style="margin-bottom: 0; display: flex; gap: 10px;">
-            <button id="dictate-btn" class="btn-red mic-btn" onclick="toggleDictation()" title="Click to speak">🎙️</button>
+            <button id="dictate-btn" class="btn-red mic-btn" onclick="toggleDictation('chat-input', 'dictate-btn')" title="Click to speak in Chat">🎙️</button>
             <input type="text" id="chat-input" placeholder="Type or speak your message here..." style="flex: 1; padding: 12px; font-size: 15px;">
             
             <select id="chat-lang" style="font-weight: bold; padding: 0 10px;" title="Your Default Profile Language">
@@ -240,7 +245,7 @@
         }
     }
 
-    // NEW Task: VIRTUAL SLATE PROCESSOR
+    // VIRTUAL SLATE PROCESSOR (UPDATED TO SUPPORT LISTEN BUTTON)
     async function processSlate(action, btn) {
         const rawText = document.getElementById('slate-text').value.trim();
         if(!rawText) return alert("Please enter some text on the virtual slate first.");
@@ -249,7 +254,13 @@
         hideUI('slate-ws', 'slate-loading');
         try {
             const data = await fetchWithLog('/virtual-slate', { rawText, action });
-            document.getElementById('slate-ws').innerHTML = marked.parse(data.processedContent);
+            const formattedHTML = marked.parse(data.processedContent);
+            
+            // Reusing the .msg-text class so our Google Voice function can read it!
+            document.getElementById('slate-ws').innerHTML = `
+                <div class="msg-text">${formattedHTML}</div>
+                <button class="listen-btn" onclick="speakChat(this)" style="margin-top: 15px; font-size: 14px; padding: 8px 15px;">🔊 Listen to Output</button>
+            `;
         } catch(err) { 
             document.getElementById('slate-ws').innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
         } finally {
@@ -279,7 +290,7 @@
         }
     }
 
-    // NEW Task 5: COMPLETION ALERTS 
+    // Task 5: COMPLETION ALERTS 
     async function getCompletionAlerts(btn) {
         if(btn) btn.disabled = true;
         hideUI('rem-ws', 'rem-loading');
@@ -374,39 +385,108 @@
         }
     }
 
-    // --- VOICE CHAT ---
+    // --- UPGRADED SMART MIC SYSTEM (Works for Chat AND Slate) ---
+    const languageCodes = {
+        "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+        "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+        "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+        "Kannada": "kn-IN", "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" 
+    };
+
+    let recognitionTarget = null;
+    let recognitionBtn = null;
     let recognition;
+
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
+        
         recognition.onresult = (e) => { 
-            document.getElementById('chat-input').value += e.results[0][0].transcript + " "; 
-            document.getElementById('dictate-btn').innerText = "🎙️"; 
-            document.getElementById('dictate-btn').classList.remove('btn-green');
-            document.getElementById('dictate-btn').classList.add('btn-red');
+            if(recognitionTarget) {
+                document.getElementById(recognitionTarget).value += e.results[0][0].transcript + " "; 
+            }
+            resetMicBtn();
+        };
+
+        recognition.onend = () => {
+            resetMicBtn();
         };
     }
-    function toggleDictation() { 
+
+    function resetMicBtn() {
+        if(recognitionBtn) {
+            document.getElementById(recognitionBtn).innerText = "🎙️"; 
+            document.getElementById(recognitionBtn).classList.remove('btn-green');
+            document.getElementById(recognitionBtn).classList.add('btn-red');
+        }
+    }
+
+    function toggleDictation(targetInputId, targetBtnId) { 
         if(recognition){ 
-            document.getElementById('dictate-btn').innerText = "🔴"; 
-            document.getElementById('dictate-btn').classList.remove('btn-red');
-            document.getElementById('dictate-btn').classList.add('btn-green');
+            // If mic is running on a different button, reset it first
+            if(recognitionBtn && recognitionBtn !== targetBtnId) {
+                resetMicBtn();
+                recognition.stop();
+            }
+
+            recognitionTarget = targetInputId;
+            recognitionBtn = targetBtnId;
+
+            const selectedLang = document.getElementById('chat-lang').value;
+            recognition.lang = languageCodes[selectedLang] || "en-US";
+
+            document.getElementById(targetBtnId).innerText = "🔴"; 
+            document.getElementById(targetBtnId).classList.remove('btn-red');
+            document.getElementById(targetBtnId).classList.add('btn-green');
+            
             recognition.start(); 
         } else {
             alert("Speech recognition is not supported in this browser.");
         }
     }
 
-    function speakChat(btnElement) { 
+    // --- GOOGLE CLOUD TEXT-TO-SPEECH ---
+    async function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
+        
+        // Target the closest .msg-text div (works for both chat and slate!)
         const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        window.speechSynthesis.speak(utterance); 
+        const selectedLang = document.getElementById('chat-lang').value;
+        
+        if (!textToSpeak) return;
+
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "⏳ Loading...";
+        btnElement.disabled = true;
+
+        try {
+            const res = await fetch(`${API_BASE}/speak`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: textToSpeak,
+                    language: selectedLang
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "TTS failed");
+
+            // Play the audio generated from Google Cloud
+            const audioStream = new Audio("data:audio/mp3;base64," + data.audioData);
+            await audioStream.play();
+
+        } catch (err) {
+            console.error("Cloud TTS Playback Error:", err);
+            alert(`⚠️ Audio error: ${err.message}`);
+        } finally {
+            btnElement.innerText = originalText;
+            btnElement.disabled = false;
+        }
     }
 
     async function sendMessage() {
         const input = document.getElementById('chat-input');
         const text = input.value.trim();
-        const targetLang = document.getElementById('chat-lang').value;
         if(!text) return;
         
         const history = document.getElementById('chat-history');
@@ -418,7 +498,7 @@
         history.scrollTop = history.scrollHeight;
         
         try {
-            const data = await fetchWithLog('/chat', { message: text, targetLanguage: targetLang });
+            const data = await fetchWithLog('/chat', { message: text });
             const rawAiText = data.reply || "I'm sorry, I encountered an error."; 
             const formattedHTML = marked.parse(rawAiText);
             

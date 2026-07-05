@@ -1,5 +1,24 @@
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
+import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
+
+// Google Cloud TTS Client Initialize using your API KEY from .env
+const ttsClient = new textToSpeech.TextToSpeechClient({
+    apiKey: process.env.GOOGLE_TTS_API_KEY
+});
+
+// Google Cloud Neural & Standard Voice Mapping
+const googleVoiceMap = {
+    "English": { languageCode: "en-IN", name: "en-IN-Neural2-B" },
+    "Hindi": { languageCode: "hi-IN", name: "hi-IN-Neural2-A" },
+    "Telugu": { languageCode: "te-IN", name: "te-IN-Standard-A" },
+    "Kannada": { languageCode: "kn-IN", name: "kn-IN-Standard-A" },
+    "Tamil": { languageCode: "ta-IN", name: "ta-IN-Standard-A" },
+    "Malayalam": { languageCode: "ml-IN", name: "ml-IN-Standard-A" },
+    "Bengali": { languageCode: "bn-IN", name: "bn-IN-Standard-A" },
+    "Marathi": { languageCode: "mr-IN", name: "mr-IN-Standard-A" },
+    "Oriya": { languageCode: "or-IN", name: "or-IN-Standard-A" }
+};
 
 // Helper Function: Logs AI Usage to the Database
 const logAIUsage = async (userInfo = {}, featureUsed) => {
@@ -43,7 +62,6 @@ Use ONLY the following textbook content:
 "${full_text_content}"
 
 The lesson plan must contain:
-
 1. Learning Objectives
 2. Prerequisite Knowledge
 3. Materials Required
@@ -56,7 +74,6 @@ The lesson plan must contain:
 10. Conclusion
 
 IMPORTANT FORMAT RULES
-
 - Use clear headings.
 - Use bullet points where appropriate.
 - Never use Markdown tables.
@@ -111,19 +128,13 @@ Generate a balanced paper with:
 - Application Based Questions
 
 Return ONLY valid JSON.
-
 Do NOT return markdown.
-
 Do NOT use backticks.
-
 Do NOT explain the JSON.
-
 Do NOT use LaTeX.
-
 Do NOT use $.
 
 Return exactly this structure:
-
 {
   "paperTitle":"",
   "totalMarks":${totalMarks},
@@ -131,7 +142,6 @@ Return exactly this structure:
 }
 
 Chapter Content
-
 "${content}"
 `;
         
@@ -159,33 +169,25 @@ export const autoCorrectAnswer = async (req, res) => {
 You are an experienced school examiner.
 
 Question
-
 "${question}"
 
 Maximum Marks
-
 ${maxMarks}
 
 Teacher Rubric
-
 "${rubric}"
 
 Student Answer
-
 "${studentAnswer}"
 
 Evaluate fairly.
-
 Award partial marks where appropriate.
 
 Return ONLY valid JSON.
-
 Do NOT return markdown.
-
 Do NOT use backticks.
 
 Return
-
 {
    "awardedMarks":0,
    "feedback":"..."
@@ -224,7 +226,6 @@ export const generateAssignmentReminders = async (req, res) => {
 Write a professional email reminder for parents.
 
 Requirements
-
 - Maximum 3 short paragraphs.
 - Friendly.
 - Professional.
@@ -234,9 +235,7 @@ Requirements
 - Use placeholder [Assignment Name].
 
 Do not use markdown.
-
 Do not use HTML.
-
 Do not use code blocks.
 `;
 
@@ -248,7 +247,7 @@ Do not use code blocks.
     }
 };
 
-// 5. ASSIGNMENT COMPLETION ALERTS (New Feature)
+// 5. ASSIGNMENT COMPLETION ALERTS
 export const getAssignmentCompletionAlerts = async (req, res) => {
     const { userInfo } = req.body;
     const teacherId = userInfo?.id || 3;
@@ -273,25 +272,18 @@ export const getAssignmentCompletionAlerts = async (req, res) => {
 You are an AI teaching assistant.
 
 Review the following assignment statistics.
-
 ${JSON.stringify(completions)}
 
 Generate a short report.
-
 Include:
-
 - Submission trend
 - Average performance
 - Students requiring attention
 
 Maximum 3 bullet points.
-
 No markdown.
-
 No HTML.
-
 No LaTeX.
-
 Plain text only.
 `;
         
@@ -320,15 +312,12 @@ export const processVirtualSlateContent = async (req, res) => {
 You are an AI classroom assistant.
 
 Teacher's rough notes:
-
 "${rawText}"
 
 Task
-
 ${instruction}
 
 Formatting Rules
-
 - Create clean notes.
 - Use headings.
 - Use bullet points.
@@ -380,30 +369,22 @@ export const getSingleStudentAnalytics = async (req, res) => {
 You are helping a teacher analyse student performance.
 
 Student Name
-
 ${studentName}
 
 Performance Data
-
 ${JSON.stringify(studentData)}
 
 Generate
-
 1. Overall Performance
 2. Strengths
 3. Weaknesses
 4. One Recommendation
 
 Maximum 4 bullet points.
-
 Plain text only.
-
 No markdown.
-
 No HTML.
-
 No LaTeX.
-
 No $ symbols.
 `;
 
@@ -449,26 +430,19 @@ export const getClassAnalytics = async (req, res) => {
 You are analysing an entire classroom.
 
 Data
-
 ${JSON.stringify(classData)}
 
 Generate
-
 - Overall class performance
 - Strong performers
 - Students needing attention
 - Teaching recommendation
 
 Maximum 5 bullet points.
-
 Plain text only.
-
 No markdown.
-
 No HTML.
-
 No LaTeX.
-
 No $.
 `;
     
@@ -492,7 +466,6 @@ export const translateText = async (req, res) => {
 Translate the following text into ${targetLanguage}.
 
 Requirements
-
 - Return ONLY the translated text.
 - Do not explain.
 - Do not add quotation marks.
@@ -501,7 +474,6 @@ Requirements
 - Do not use markdown.
 
 Text
-
 "${text}"
 `;
         
@@ -513,9 +485,10 @@ Text
     }
 };
 
-// 11. UNIFIED TEACHER CHATBOT (UPGRADED WITH MEMORY AND NATIVE SCRIPT RULES)
+// 11. UNIFIED TEACHER CHATBOT (UPGRADED WITH AUTO LANGUAGE DETECTION)
 export const teacherChatbot = async (req, res) => {
-    const { message, targetLanguage = "English", userInfo } = req.body;
+    // UPDATED: targetLanguage parameter has been removed completely
+    const { message, userInfo } = req.body; 
     
     // Use the user's ID to fetch their specific chat history
     const userId = userInfo?.id || 3; 
@@ -548,7 +521,6 @@ export const teacherChatbot = async (req, res) => {
 You are SGS AI Teacher Assistant.
 
 You help teachers with
-
 - Lesson Planning
 - Question Papers
 - Student Assessment
@@ -558,18 +530,15 @@ You help teachers with
 - Parent Communication
 
 Conversation History
-
 ${chatHistory
     .map(chat => `${chat.role === "model" ? "Assistant" : "Teacher"}: ${chat.parts[0].text}`)
     .join("\n")}
 
-Teacher's latest question
+Teacher's latest question:
+"${message}"
 
-${message}
-
-IMPORTANT RESPONSE RULES
-
-- Respond in ${targetLanguage}.
+IMPORTANT RESPONSE RULES:
+- AUTO-LANGUAGE DETECTION: Analyze the language and script of the Teacher's latest question. You MUST reply entirely in that exact same language and script. (e.g., if the question is in Hindi, reply in Hindi; if Telugu, reply in Telugu; if English, reply in English).
 - Be concise but complete.
 - Never use Markdown tables.
 - Never use Markdown code blocks.
@@ -601,5 +570,41 @@ IMPORTANT RESPONSE RULES
     } catch (err) {
         console.error("🚨 CHATBOT CRASH:", err);
         res.status(500).json({ error: "Chat failed.", details: err.message });
+    }
+};
+
+// ==========================================
+// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER
+// ==========================================
+export const handleTextToSpeech = async (req, res) => {
+    const { text, language = "English" } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: "Text is required for speech synthesis" });
+    }
+
+    try {
+        const voiceConfig = googleVoiceMap[language] || googleVoiceMap["English"];
+
+        const request = {
+            input: { text: text },
+            voice: { languageCode: voiceConfig.languageCode, name: voiceConfig.name },
+            audioConfig: { audioEncoding: 'MP3' },
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        const audioBase64 = response.audioContent.toString('base64');
+
+        res.json({
+            status: "success",
+            audioData: audioBase64
+        });
+
+    } catch (err) {
+        console.error("🚨 GOOGLE TTS CRASH:", err);
+        res.status(500).json({
+            error: "Failed to generate Google cloud speech output",
+            details: err.message
+        });
     }
 };

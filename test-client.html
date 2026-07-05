@@ -56,6 +56,24 @@
 <div class="container">
     <h1>🎓 Student AI Learning Dashboard</h1>
 
+    <div style="background: #e8f8f5; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #1abc9c; display: flex; align-items: center; gap: 10px;">
+        <span style="font-weight: bold; color: #16a085;">🌍 Global Target Language:</span>
+        <select id="chat-lang" style="font-weight: bold;" title="Your Default Profile Language">
+            <option value="English">English</option>
+            <option value="Telugu">Telugu</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Oriya">Oriya</option>
+            <option value="Bengali">Bengali</option>
+            <option value="Marathi">Marathi</option>
+            <option value="Sanskrit">Sanskrit</option>
+            <option value="Tamil">Tamil</option>
+            <option value="Malayalam">Malayalam</option>
+            <option value="Kannada">Kannada</option>
+            <option value="French">French</option>
+            <option value="Spanish">Spanish</option>
+        </select>
+    </div>
+
     <div class="dashboard-section">
         <h2>📖 AI Paced Learning</h2>
         <div class="btn-group">
@@ -63,7 +81,7 @@
             <button class="btn-average" onclick="generateContent('average', this)">Average Pace</button>
             <button class="btn-quick" onclick="generateContent('quick', this)">Quick Pace</button>
         </div>
-        <div id="content-loading" class="loading-spinner" style="display: none;">✍️ Gemini is rewriting the chapter...</div>
+        <div id="content-loading" class="loading-spinner" style="display: none;">✍️ Gemini is translating and rewriting the chapter...</div>
         <div id="paced-content-workspace" class="output-box" style="display: none;"></div>
     </div>
 
@@ -88,32 +106,12 @@
     <div class="dashboard-section">
         <h2>💬 🎙️ AI Multilingual Tutor</h2>
         <div id="chat-feed">
-            <div class="chat-msg ai-msg">Hi there! I am your AI Tutor. You can talk to me or type, and select your default preferred language below!</div>
+            <div class="chat-msg ai-msg">Hi there! I am your AI Tutor. You can talk to me or type, and I will reply in your selected language!</div>
         </div>
         
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button id="dictate-btn" class="mic-btn" onclick="toggleDictation()" title="Click to Speak">🎙️</button>
-            
             <input type="text" id="chat-input" style="flex: 1;" placeholder="Ask me anything...">
-            
-            <select id="chat-lang" style="font-weight: bold;" title="Your Default Profile Language">
-                <option value="English">English</option>
-                <option value="Telugu">Telugu</option>
-                <option value="Hindi">Hindi</option>
-                <option value="Oriya">Oriya</option>
-                <option value="Bengali">Bengali</option>
-                <option value="Marathi">Marathi</option>
-                <option value="Sanskrit">Sanskrit</option>
-                <option value="Tamil">Tamil</option>
-                <option value="Malayalam">Malayalam</option>
-                <option value="Kannada">Kannada</option>
-                <option value="Koya">Tribal - Koya</option>
-                <option value="Gondi">Tribal - Gondi</option>
-                <option value="Konda">Tribal - Konda</option>
-                <option value="French">French</option>
-                <option value="Spanish">Spanish</option>
-            </select>
-            
             <button class="btn-quiz" id="chat-btn" onclick="sendChatMessage()">Send</button>
         </div>
     </div>
@@ -137,16 +135,26 @@
         return data;
     }
 
-    // Paced Content (with anti-spam)
+    // Paced Content - NOW WITH TARGET LANGUAGE & TEXT TO SPEECH
     async function generateContent(pace, btn) {
         if(btn) btn.disabled = true;
         const workspace = document.getElementById('paced-content-workspace');
         const loading = document.getElementById('content-loading');
+        const targetLang = document.getElementById('chat-lang').value; // Fetching from dropdown
+        
         workspace.style.display = 'none'; loading.style.display = 'block';
 
         try {
-            const data = await fetchWithLog('/generate-content', { chapterId: 1, pace });
-            workspace.innerHTML = marked.parse(`**Your ${pace.toUpperCase()} track content:**\n\n${data.generatedContent}`);
+            // Sending targetLanguage to backend
+            const data = await fetchWithLog('/generate-content', { chapterId: 1, pace: pace, targetLanguage: targetLang });
+            
+            // Re-using the same structure as chat so the 'speakChat' function works on it instantly!
+            workspace.innerHTML = `
+                <div>
+                    <div class="msg-text">${marked.parse(`**Your ${pace.toUpperCase()} track content:**\n\n${data.generatedContent}`)}</div>
+                    <button class="listen-btn" onclick="speakChat(this)" style="margin-top: 15px; background: #2980b9;" title="Listen to this lesson">🔊 Listen to Lesson</button>
+                </div>
+            `;
             if (window.MathJax) MathJax.typesetPromise();
         } catch (err) {
             workspace.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`;
@@ -157,7 +165,7 @@
         }
     }
 
-    // Quiz Generator & Grading (with anti-spam)
+    // Quiz Generator & Grading
     let currentQuiz = [];
     async function triggerQuizGeneration(btn) {
         if(btn) btn.disabled = true;
@@ -194,8 +202,7 @@
             f.style.display = 'block';
             
             if (selected && selected.value === q.answer) {
-                f.style.background = '#d4edda'; 
-                correctCount++;
+                f.style.background = '#d4edda'; correctCount++;
             } else { f.style.background = '#f8d7da'; }
             f.innerHTML = `<strong>Correct Answer:</strong> ${q.answer}<br><em>${q.explanation}</em>`;
         });
@@ -205,7 +212,7 @@
         summaryDiv.innerHTML = `<h3 style="margin-top:0; color:#27ae60;">🎯 Quiz Complete!</h3><p style="font-size: 18px;">You scored <strong>${correctCount} out of ${totalCount}</strong>.</p><p style="margin-bottom:0;">Review your answers above to see detailed explanations from the AI Tutor.</p>`;
     }
 
-    // Analytics (with dynamic DB rendering)
+    // Analytics
     let chartInstance = null;
     async function loadAnalytics(btn) {
         if(btn) btn.disabled = true;
@@ -223,24 +230,15 @@
             const ctx = document.getElementById('performanceChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
             
-            // Render the dynamic scores from the database
             chartInstance = new Chart(ctx, { 
                 type: 'bar', 
-                data: { 
-                    labels: data.chartData.map(g => g.test_name), 
-                    datasets: [ 
-                        { label: 'Score %', data: data.chartData.map(g => g.score), backgroundColor: '#3498db' } 
-                    ] 
-                }, 
+                data: { labels: data.chartData.map(g => g.test_name), datasets: [ { label: 'Score %', data: data.chartData.map(g => g.score), backgroundColor: '#3498db' } ] }, 
                 options: { scales: { y: { min: 0, max: 100 } } } 
             });
         } catch (err) {
-            workspace.style.display = 'flex'; 
-            aiText.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; 
-            document.querySelector('.chart-container').style.display = 'none';
+            workspace.style.display = 'flex'; aiText.innerHTML = `<span class="error-text">🚨 ${err.message}</span>`; document.querySelector('.chart-container').style.display = 'none';
         } finally { 
-            if(btn) btn.disabled = false; 
-            loading.style.display = 'none'; 
+            if(btn) btn.disabled = false; loading.style.display = 'none'; 
         }
     }
 
@@ -249,8 +247,7 @@
         "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
         "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
         "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
-        "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
-        "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US"
+        "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES"
     };
 
     let recognition;
@@ -273,18 +270,15 @@
         if(recognition){ 
             const selectedLang = document.getElementById('chat-lang').value;
             recognition.lang = languageCodes[selectedLang] || "en-US";
-            
             document.getElementById('dictate-btn').innerText = "🔴"; 
             document.getElementById('dictate-btn').style.backgroundColor = "#2ecc71"; 
             recognition.start(); 
-        } else { 
-            alert("Speech recognition is not supported in this browser. Please use Chrome."); 
-        }
+        } else { alert("Speech recognition is not supported in this browser."); }
     }
 
+    // Speaks whatever text is inside the sibling .msg-text container
     async function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
-        
         const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
         const selectedLang = document.getElementById('chat-lang').value;
         
@@ -296,10 +290,7 @@
             const res = await fetch(`${API_BASE}/speak`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: textToSpeak,
-                    language: selectedLang
-                })
+                body: JSON.stringify({ text: textToSpeak, language: selectedLang })
             });
 
             const data = await res.json();
@@ -310,14 +301,12 @@
 
         } catch (err) {
             console.error("Cloud TTS Playback Error:", err);
-            alert(`⚠️ Audio play nahi ho saka: ${err.message}`);
+            alert(`⚠️ Audio could not be played: ${err.message}`);
         } finally {
             btnElement.innerText = originalText;
             btnElement.disabled = false;
         }
     }
-
-    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
 
     async function sendChatMessage() {
         const input = document.getElementById('chat-input');
@@ -333,7 +322,6 @@
         
         try {
             const data = await fetchWithLog('/chat', { message: msg, targetLanguage: targetLang });
-            
             const rawAiText = data.reply || "I'm sorry, I encountered an error processing that."; 
             const formattedHTML = marked.parse(rawAiText);
             

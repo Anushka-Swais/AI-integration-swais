@@ -21,6 +21,9 @@
         button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.7; }
         .btn-blue { background-color: #2980b9; } .btn-blue:hover { background-color: #1f618d; }
         
+        /* New Mic Button Style */
+        .mic-btn { border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background-color: #e74c3c; flex-shrink: 0;}
+        
         .output-box { background: #f8f9fa; border: 1px solid #e1e8ed; padding: 20px; border-radius: 4px; margin-top: 15px; font-size: 15px; line-height: 1.6; }
         .loading-spinner { color: #16a085; font-style: italic; margin: 15px 0; padding: 10px; background: #e8f8f5; border-left: 4px solid #16a085;}
         .error-text { color: #c0392b; font-weight: bold; }
@@ -62,11 +65,13 @@
 
     <div class="dashboard-section">
         <h2>🌍 School Communication Tools</h2>
-        <p>Translate school notices or use text-to-speech to listen to them.</p>
+        <p>Speak to type, translate school notices, or use text-to-speech to listen to them.</p>
         
-        <textarea id="comm-text" rows="4" style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;" placeholder="Paste an email, report card note, or assignment details here..."></textarea>
+        <textarea id="comm-text" rows="4" style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;" placeholder="Paste an email, report card note, or use the mic to dictate..."></textarea>
         
         <div class="controls">
+            <button id="dictate-btn" class="mic-btn" onclick="toggleDictation()" title="Click to Speak">🎙️</button>
+            
             <select id="lang-select">
                 <option value="English">English</option>
                 <option value="Hindi">Hindi</option>
@@ -85,7 +90,7 @@
                 <option value="French">French</option>
             </select>
             <button onclick="translateText(this)">Translate Text</button>
-            <button onclick="speakText()" class="btn-blue">🔊 Listen (Read Aloud)</button>
+            <button id="speak-btn" onclick="speakText(this)" class="btn-blue">🔊 Listen (Read Aloud)</button>
         </div>
     </div>
 </div>
@@ -190,7 +195,45 @@
         }
     }
 
-    // 4 & 5. Translate & Voice
+    // --- DICTATION & VOICE SETUP ---
+    const languageCodes = {
+        "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
+        "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
+        "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
+        "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
+        "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" 
+    };
+
+    let recognition;
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        
+        recognition.onresult = (e) => { 
+            document.getElementById('comm-text').value += e.results[0][0].transcript + " "; 
+            document.getElementById('dictate-btn').innerText = "🎙️"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#e74c3c";
+        };
+
+        recognition.onend = () => {
+            document.getElementById('dictate-btn').innerText = "🎙️"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#e74c3c";
+        };
+    }
+
+    function toggleDictation() { 
+        if(recognition){ 
+            const selectedLang = document.getElementById('lang-select').value;
+            recognition.lang = languageCodes[selectedLang] || "en-US";
+            
+            document.getElementById('dictate-btn').innerText = "🔴"; 
+            document.getElementById('dictate-btn').style.backgroundColor = "#2ecc71"; 
+            recognition.start(); 
+        } else { 
+            alert("Speech recognition is not supported in this browser. Please use Chrome."); 
+        }
+    }
+
+    // 4. Translate Logic
     async function translateText(btn) {
         const text = document.getElementById('comm-text').value;
         const lang = document.getElementById('lang-select').value;
@@ -207,38 +250,45 @@
         }
     }
 
-    // Advanced Text-to-Speech logic
-    function speakText() {
-        window.speechSynthesis.cancel();
-        const text = document.getElementById('comm-text').value;
-        if (!text) return;
+    // 5. NEW: Google Cloud Backend TTS Logic
+    async function speakText(btnElement) { 
+        window.speechSynthesis.cancel(); // Stop any built-in speech playing
         
-        const utterance = new SpeechSynthesisUtterance(text);
+        const textToSpeak = document.getElementById('comm-text').value;
         const selectedLang = document.getElementById('lang-select').value;
         
-        const languageCodes = {
-            "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
-            "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
-            "Sanskrit": "sa-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN",
-            "Kannada": "kn-IN", "French": "fr-FR", "Spanish": "es-ES",
-            "Koya": "en-US", "Gondi": "en-US", "Konda": "en-US" 
-        };
+        if (!textToSpeak) return;
 
-        const targetLangCode = languageCodes[selectedLang] || "en-US";
-        utterance.lang = targetLangCode;
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "⏳ Loading Voice...";
+        btnElement.disabled = true;
 
-        const availableVoices = window.speechSynthesis.getVoices();
-        const voiceFound = availableVoices.find(voice => voice.lang.startsWith(targetLangCode.split('-')[0]));
+        try {
+            // Reaches out to the parent backend route you just created!
+            const res = await fetch(`${API_BASE}/speak`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: textToSpeak,
+                    language: selectedLang
+                })
+            });
 
-        if (!voiceFound && targetLangCode !== "en-US") {
-            alert(`⚠️ Voice Missing: Your computer does not have the ${selectedLang} audio voice installed!`);
-        } else if (voiceFound) {
-            utterance.voice = voiceFound;
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "TTS failed");
+
+            // Play the audio generated from the cloud
+            const audioStream = new Audio("data:audio/mp3;base64," + data.audioData);
+            await audioStream.play();
+
+        } catch (err) {
+            console.error("Cloud TTS Playback Error:", err);
+            alert(`⚠️ Audio error: ${err.message}`);
+        } finally {
+            btnElement.innerText = originalText;
+            btnElement.disabled = false;
         }
-
-        window.speechSynthesis.speak(utterance);
     }
-    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
 </script>
 </body>
 </html>

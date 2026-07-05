@@ -1,5 +1,24 @@
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
+import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
+
+// Google Cloud TTS Client Initialize using your API KEY from .env
+const ttsClient = new textToSpeech.TextToSpeechClient({
+    apiKey: process.env.GOOGLE_TTS_API_KEY
+});
+
+// Google Cloud Voice Mapping (For multiple languages)
+const googleVoiceMap = {
+    "English": { languageCode: "en-IN", name: "en-IN-Neural2-B" },
+    "Hindi": { languageCode: "hi-IN", name: "hi-IN-Neural2-A" },
+    "Telugu": { languageCode: "te-IN", name: "te-IN-Standard-A" },
+    "Kannada": { languageCode: "kn-IN", name: "kn-IN-Standard-A" },
+    "Tamil": { languageCode: "ta-IN", name: "ta-IN-Standard-A" },
+    "Malayalam": { languageCode: "ml-IN", name: "ml-IN-Standard-A" },
+    "Bengali": { languageCode: "bn-IN", name: "bn-IN-Standard-A" },
+    "Marathi": { languageCode: "mr-IN", name: "mr-IN-Standard-A" },
+    "Oriya": { languageCode: "or-IN", name: "or-IN-Standard-A" }
+};
 
 // Helper Function: Logs AI Usage to the Database
 const logAIUsage = async (userInfo = {}, featureUsed) => {
@@ -218,5 +237,41 @@ School Communication
     } catch (err) {
         console.error("🚨 TRANSLATOR CRASH:", err);
         res.status(500).json({ error: "Translation failed", details: err.message });
+    }
+};
+
+// ==========================================
+// 5. GOOGLE CLOUD TEXT-TO-SPEECH (For Parent Notices/Remarks)
+// ==========================================
+export const handleTextToSpeech = async (req, res) => {
+    const { text, language = "English" } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: "Text is required for speech synthesis" });
+    }
+
+    try {
+        const voiceConfig = googleVoiceMap[language] || googleVoiceMap["English"];
+
+        const request = {
+            input: { text: text },
+            voice: { languageCode: voiceConfig.languageCode, name: voiceConfig.name },
+            audioConfig: { audioEncoding: 'MP3' },
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        const audioBase64 = response.audioContent.toString('base64');
+
+        res.json({
+            status: "success",
+            audioData: audioBase64
+        });
+
+    } catch (err) {
+        console.error("🚨 GOOGLE TTS CRASH:", err);
+        res.status(500).json({
+            error: "Failed to generate Google cloud speech output",
+            details: err.message
+        });
     }
 };
