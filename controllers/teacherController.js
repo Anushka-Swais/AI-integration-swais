@@ -575,8 +575,9 @@ IMPORTANT RESPONSE RULES:
     }
 };
 
+
 // ==========================================
-// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER
+// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER (SMART SCRIPT DETECT)
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
     const { text, language = "English" } = req.body;
@@ -586,30 +587,51 @@ export const handleTextToSpeech = async (req, res) => {
     }
 
     try {
-        // 🔥 FIX: Find the language code, default to English (India) if not found
-        const langCode = googleVoiceMap[language] || "en-IN";
+        // 1. Initial Mapping based on Dropdown
+        const googleVoiceMap = {
+            "English": "en-IN", "Hindi": "hi-IN", "Telugu": "te-IN", "Telegu": "te-IN", 
+            "Kannada": "kn-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN", "Bengali": "bn-IN", 
+            "Marathi": "mr-IN", "Oriya": "hi-IN", "Sanskrit": "hi-IN"
+        };
+        
+        let finalLangCode = googleVoiceMap[language] || "en-IN";
 
+        // 2. 🔥 BULLETPROOF SCRIPT DETECTION 🔥
+        // No matter what the dropdown says, if we see regional characters, we OVERRIDE the language code.
+        if (/[\u0C00-\u0C7F]/.test(text)) { 
+            finalLangCode = "te-IN"; // Telugu detected
+        } else if (/[\u0B80-\u0BFF]/.test(text)) { 
+            finalLangCode = "ta-IN"; // Tamil detected
+        } else if (/[\u0C80-\u0CFF]/.test(text)) { 
+            finalLangCode = "kn-IN"; // Kannada detected
+        } else if (/[\u0D00-\u0D7F]/.test(text)) { 
+            finalLangCode = "ml-IN"; // Malayalam detected
+        } else if (/[\u0980-\u09FF]/.test(text)) { 
+            finalLangCode = "bn-IN"; // Bengali detected
+        } else if (/[\u0900-\u097F]/.test(text)) { 
+            // Devanagari detected (Hindi, Marathi, Sanskrit)
+            if (language !== "Marathi" && language !== "Sanskrit") {
+                finalLangCode = "hi-IN"; 
+            }
+        }
+
+        // 3. We ONLY send the languageCode. We removed the strict 'name'.
+        // This forces Google to automatically pick the best working voice for that language!
         const request = {
             input: { text: text },
-            // 🔥 FIX: Removed the strict 'name' parameter. 
-            // Google will now auto-select the best voice based on the langCode!
-            voice: { languageCode: langCode }, 
+            voice: { languageCode: finalLangCode }, 
             audioConfig: { audioEncoding: 'MP3' },
         };
 
         const [response] = await ttsClient.synthesizeSpeech(request);
-        const audioBase64 = response.audioContent.toString('base64');
-
+        
         res.json({
             status: "success",
-            audioData: audioBase64
+            audioData: response.audioContent.toString('base64')
         });
 
     } catch (err) {
         console.error("🚨 GOOGLE TTS CRASH:", err);
-        res.status(500).json({
-            error: "Failed to generate Google cloud speech output",
-            details: err.message
-        });
+        res.status(500).json({ error: "Voice generation failed", details: err.message });
     }
 };
