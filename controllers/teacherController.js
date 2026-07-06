@@ -575,9 +575,8 @@ IMPORTANT RESPONSE RULES:
     }
 };
 
-
 // ==========================================
-// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER (SMART SCRIPT DETECT)
+// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER (STRICT VOICE MAPPING)
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
     const { text, language = "English" } = req.body;
@@ -587,39 +586,41 @@ export const handleTextToSpeech = async (req, res) => {
     }
 
     try {
-        // 1. Initial Mapping based on Dropdown
-        const googleVoiceMap = {
-            "English": "en-IN", "Hindi": "hi-IN", "Telugu": "te-IN", "Telegu": "te-IN", 
-            "Kannada": "kn-IN", "Tamil": "ta-IN", "Malayalam": "ml-IN", "Bengali": "bn-IN", 
-            "Marathi": "mr-IN", "Oriya": "hi-IN", "Sanskrit": "hi-IN"
-        };
-        
-        let finalLangCode = googleVoiceMap[language] || "en-IN";
+        // 1. Default to English
+        let finalLangCode = "en-IN";
+        let finalVoiceName = "en-IN-Neural2-B"; 
 
-        // 2. 🔥 BULLETPROOF SCRIPT DETECTION 🔥
-        // No matter what the dropdown says, if we see regional characters, we OVERRIDE the language code.
+        // 2. 🔥 SMART SCRIPT DETECT + EXACT VOICE NAMES
+        // Google Cloud REQUIRES the exact 'name' for regional languages to work properly.
         if (/[\u0C00-\u0C7F]/.test(text)) { 
-            finalLangCode = "te-IN"; // Telugu detected
-        } else if (/[\u0B80-\u0BFF]/.test(text)) { 
-            finalLangCode = "ta-IN"; // Tamil detected
+            // Telugu Detected
+            finalLangCode = "te-IN"; finalVoiceName = "te-IN-Standard-A"; 
         } else if (/[\u0C80-\u0CFF]/.test(text)) { 
-            finalLangCode = "kn-IN"; // Kannada detected
+            // Kannada Detected
+            finalLangCode = "kn-IN"; finalVoiceName = "kn-IN-Standard-A"; 
         } else if (/[\u0D00-\u0D7F]/.test(text)) { 
-            finalLangCode = "ml-IN"; // Malayalam detected
+            // Malayalam Detected
+            finalLangCode = "ml-IN"; finalVoiceName = "ml-IN-Standard-A"; 
         } else if (/[\u0980-\u09FF]/.test(text)) { 
-            finalLangCode = "bn-IN"; // Bengali detected
+            // Bengali Detected
+            finalLangCode = "bn-IN"; finalVoiceName = "bn-IN-Standard-A"; 
+        } else if (/[\u0B80-\u0BFF]/.test(text)) { 
+            // Tamil Detected
+            finalLangCode = "ta-IN"; finalVoiceName = "ta-IN-Standard-A"; 
         } else if (/[\u0900-\u097F]/.test(text)) { 
-            // Devanagari detected (Hindi, Marathi, Sanskrit)
-            if (language !== "Marathi" && language !== "Sanskrit") {
-                finalLangCode = "hi-IN"; 
+            // Devanagari Detected (Shared by Hindi & Marathi)
+            // If the user selected Marathi in the dropdown, force Marathi voice
+            if (language === "Marathi") {
+                finalLangCode = "mr-IN"; finalVoiceName = "mr-IN-Standard-A";
+            } else {
+                finalLangCode = "hi-IN"; finalVoiceName = "hi-IN-Neural2-A";
             }
         }
 
-        // 3. We ONLY send the languageCode. We removed the strict 'name'.
-        // This forces Google to automatically pick the best working voice for that language!
+        // 3. Send BOTH languageCode and name to prevent crashes
         const request = {
             input: { text: text },
-            voice: { languageCode: finalLangCode }, 
+            voice: { languageCode: finalLangCode, name: finalVoiceName }, 
             audioConfig: { audioEncoding: 'MP3' },
         };
 
