@@ -7,17 +7,19 @@ const ttsClient = new textToSpeech.TextToSpeechClient({
     apiKey: process.env.GOOGLE_TTS_API_KEY
 });
 
-// Google Cloud Neural & Standard Voice Mapping
+// 🌍 UPDATED: Google Cloud Voice Mapping (Using Language Codes Only)
 const googleVoiceMap = {
-    "English": { languageCode: "en-IN", name: "en-IN-Neural2-B" },
-    "Hindi": { languageCode: "hi-IN", name: "hi-IN-Neural2-A" },
-    "Telugu": { languageCode: "te-IN", name: "te-IN-Standard-A" },
-    "Kannada": { languageCode: "kn-IN", name: "kn-IN-Standard-A" },
-    "Tamil": { languageCode: "ta-IN", name: "ta-IN-Standard-A" },
-    "Malayalam": { languageCode: "ml-IN", name: "ml-IN-Standard-A" },
-    "Bengali": { languageCode: "bn-IN", name: "bn-IN-Standard-A" },
-    "Marathi": { languageCode: "mr-IN", name: "mr-IN-Standard-A" },
-    "Oriya": { languageCode: "or-IN", name: "or-IN-Standard-A" }
+    "English": "en-IN",
+    "Hindi": "hi-IN",
+    "Telugu": "te-IN",
+    "Telegu": "te-IN", // Added alternate spelling to be safe
+    "Kannada": "kn-IN",
+    "Tamil": "ta-IN",
+    "Malayalam": "ml-IN",
+    "Bengali": "bn-IN",
+    "Marathi": "mr-IN",
+    "Oriya": "hi-IN", // Oriya/Odia is often unsupported by TTS, safely falls back to Hindi
+    "Sanskrit": "hi-IN" // Sanskrit reads best using the Hindi TTS engine
 };
 
 // Helper Function: Logs AI Usage to the Database
@@ -584,11 +586,14 @@ export const handleTextToSpeech = async (req, res) => {
     }
 
     try {
-        const voiceConfig = googleVoiceMap[language] || googleVoiceMap["English"];
+        // 🔥 FIX: Find the language code, default to English (India) if not found
+        const langCode = googleVoiceMap[language] || "en-IN";
 
         const request = {
             input: { text: text },
-            voice: { languageCode: voiceConfig.languageCode, name: voiceConfig.name },
+            // 🔥 FIX: Removed the strict 'name' parameter. 
+            // Google will now auto-select the best voice based on the langCode!
+            voice: { languageCode: langCode }, 
             audioConfig: { audioEncoding: 'MP3' },
         };
 
