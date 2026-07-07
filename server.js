@@ -15,8 +15,8 @@ import parentRoutes from './routes/parentRoutes.js';
 import headmasterRoutes from './routes/headmasterRoutes.js'; 
 import adminRoutes from './routes/adminRoutes.js';
 
-// 🔊 IMPORT TTS CONTROLLER FOR THE MISSING ROUTE
-import { handleTextToSpeech } from './controllers/teacherController.js';
+// 🔊 IMPORT CONTROLLERS FOR THE MISSING ROUTES
+import { handleTextToSpeech, translateText } from './controllers/teacherController.js'; // ADDED translateText HERE
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,8 +39,9 @@ app.use('/api/v1/ai/parent', parentRoutes);
 app.use('/api/v1/ai/headmaster', headmasterRoutes); 
 app.use('/api/v1/ai/admin', adminRoutes);
 
-// 🔊 ADD THE MISSING FRONTEND ROUTE HERE
+// 🔊 ADD THE MISSING FRONTEND ROUTES HERE
 app.post('/api/v1/speech/to-voice', handleTextToSpeech);
+app.post('/api/v1/translate/text', translateText); // 🌐 ADDED THIS TRANSLATE ROUTE
 
 // 🔍 DATABASE CONNECTION TEST
 pool.query('SELECT NOW()', (err, res) => {
