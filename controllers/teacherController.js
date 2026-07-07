@@ -102,27 +102,23 @@ IMPORTANT FORMAT RULES
         res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
     }
 };
- 
+
 // 2. AUTO QUESTION PAPER GENERATOR 
 export const generateQuestionPaper = async (req, res) => {
-    // 1. Added questionType with a default value of "ALL"
+    // ✅ FIX 1: We are now extracting 'questionType' from the frontend payload
     const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body;
     
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        // Assuming you have a logAIUsage helper function
-        if (typeof logAIUsage === 'function') {
-             await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
-        }
+        await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
 
-        // Fetch chapter content from DB
         const result = await pool.query('SELECT full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const content = result.rows[0].full_text_content;
         
-        // 2. Dynamic prompt instruction based on the requested question type
+        // ✅ FIX 2: We dynamically force Gemini to obey the selected question type
         let typeInstruction = "";
         if (questionType.toUpperCase() === "ALL") {
             typeInstruction = `Generate a balanced paper with a mix of:
@@ -132,11 +128,12 @@ export const generateQuestionPaper = async (req, res) => {
 - Long Answer
 - Application Based Questions`;
         } else {
-            // Making the prompt aggressively strict so the LLM doesn't ignore it
+            // Aggressively strict instruction for specific types like "MCQ"
             typeInstruction = `🚨 CRITICAL INSTRUCTION 🚨:
 You MUST generate a paper containing ONLY ${questionType} questions.
-DO NOT include any other question types.
-DO NOT create different sections for different question types. 
+DO NOT include Short Answer questions.
+DO NOT include Long Answer questions.
+DO NOT create different sections (like Section A, Section B). 
 EVERY SINGLE QUESTION must be of the type: ${questionType}.`;
         }
         
@@ -167,7 +164,6 @@ Chapter Content
 "${content}"
 `;
         
-        // Assuming 'model' is your initialized Gemini client
         const aiResult = await model.generateContent(prompt);
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
