@@ -111,8 +111,12 @@ export const generateQuestionPaper = async (req, res) => {
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
+        // Assuming you have a logAIUsage helper function
+        if (typeof logAIUsage === 'function') {
+             await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
+        }
 
+        // Fetch chapter content from DB
         const result = await pool.query('SELECT full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
@@ -128,7 +132,12 @@ export const generateQuestionPaper = async (req, res) => {
 - Long Answer
 - Application Based Questions`;
         } else {
-            typeInstruction = `Generate a paper containing ONLY ${questionType} questions.`;
+            // Making the prompt aggressively strict so the LLM doesn't ignore it
+            typeInstruction = `🚨 CRITICAL INSTRUCTION 🚨:
+You MUST generate a paper containing ONLY ${questionType} questions.
+DO NOT include any other question types.
+DO NOT create different sections for different question types. 
+EVERY SINGLE QUESTION must be of the type: ${questionType}.`;
         }
         
         const prompt = `
@@ -158,6 +167,7 @@ Chapter Content
 "${content}"
 `;
         
+        // Assuming 'model' is your initialized Gemini client
         const aiResult = await model.generateContent(prompt);
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
