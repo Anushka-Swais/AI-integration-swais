@@ -102,19 +102,34 @@ IMPORTANT FORMAT RULES
         res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
     }
 };
-
+ 
 // 2. AUTO QUESTION PAPER GENERATOR 
 export const generateQuestionPaper = async (req, res) => {
-    const { chapterId, difficulty = "Medium", totalMarks = 20, userInfo } = req.body;
+    // 1. Added questionType with a default value of "ALL"
+    const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body;
+    
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        await logAIUsage(userInfo, "Generate Exam Paper");
+        await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
 
         const result = await pool.query('SELECT full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const content = result.rows[0].full_text_content;
+        
+        // 2. Dynamic prompt instruction based on the requested question type
+        let typeInstruction = "";
+        if (questionType.toUpperCase() === "ALL") {
+            typeInstruction = `Generate a balanced paper with a mix of:
+- MCQs
+- True/False
+- Short Answer
+- Long Answer
+- Application Based Questions`;
+        } else {
+            typeInstruction = `Generate a paper containing ONLY ${questionType} questions.`;
+        }
         
         const prompt = `
 You are an experienced examination paper setter.
@@ -123,11 +138,7 @@ Generate a ${difficulty} level question paper.
 
 The total marks MUST equal exactly ${totalMarks}.
 
-Generate a balanced paper with:
-- MCQs
-- Short Answer
-- Long Answer
-- Application Based Questions
+${typeInstruction}
 
 Return ONLY valid JSON.
 Do NOT return markdown.
