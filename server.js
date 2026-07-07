@@ -39,10 +39,6 @@ app.use('/api/v1/ai/parent', parentRoutes);
 app.use('/api/v1/ai/headmaster', headmasterRoutes); 
 app.use('/api/v1/ai/admin', adminRoutes);
 
-// 🔊 ADD THE MISSING FRONTEND ROUTES HERE
-app.post('/api/v1/speech/to-voice', handleTextToSpeech);
-app.post('/api/v1/translate/text', translateText); // 🌐 ADDED THIS TRANSLATE ROUTE
-
 // 🔍 DATABASE CONNECTION TEST
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
