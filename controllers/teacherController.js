@@ -105,7 +105,6 @@ IMPORTANT FORMAT RULES
 
 // 2. AUTO QUESTION PAPER GENERATOR 
 export const generateQuestionPaper = async (req, res) => {
-    // ✅ FIX 1: We are now extracting 'questionType' from the frontend payload
     const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body;
     
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
@@ -118,46 +117,65 @@ export const generateQuestionPaper = async (req, res) => {
         
         const content = result.rows[0].full_text_content;
         
-        // ✅ FIX 2: We dynamically force Gemini to obey the selected question type
         let typeInstruction = "";
-        if (questionType.toUpperCase() === "ALL") {
-            typeInstruction = `Generate a balanced paper with a mix of:
-- MCQs
-- True/False
-- Short Answer
-- Long Answer
-- Application Based Questions`;
+        let marksInstruction = "";
+        const typeUpper = questionType.toUpperCase();
+
+        // 🔥 UPDATED: "ALL" now strictly includes Long Answers and gives a mark distribution guide
+        if (typeUpper === "ALL") {
+            typeInstruction = `Generate a balanced exam paper containing a mix of ALL the following types: 
+1. Multiple Choice (MCQ)
+2. True/False
+3. Short Answer
+4. Long Answer`;
+            marksInstruction = `The sum of the marks for all questions MUST equal exactly ${totalMarks}. Distribute the marks logically: MCQs and True/False should be 1 mark each, Short Answers should be 2 to 3 marks each, and Long Answers should be 4 to 5 marks each.`;
+        
+        } else if (typeUpper === "MCQ") {
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Multiple Choice Questions (MCQs). Do not include any other question types.`;
+            marksInstruction = `Each MCQ is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions to reach the ${totalMarks} total marks.`;
+        } else if (typeUpper === "TRUE/FALSE" || typeUpper === "TRUE FALSE") {
+            typeInstruction = `🚨 CRITICAL: Generate ONLY True or False questions. Do not include any other question types.`;
+            marksInstruction = `Each True/False question is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions to reach the ${totalMarks} total marks.`;
+        } else if (typeUpper === "SHORT ANSWER") {
+            const shortQCount = Math.floor(totalMarks / 2); 
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions. Do not include MCQs or True/False.`;
+            marksInstruction = `Each Short Answer question is worth exactly 2 marks. You MUST generate EXACTLY ${shortQCount} questions. If there is 1 mark left over, make the final question worth 3 marks to reach exactly ${totalMarks} total marks.`;
+        } else if (typeUpper === "LONG ANSWER") {
+            // Added this just in case you want a "Long Answer Only" option later!
+            const longQCount = Math.floor(totalMarks / 5);
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Long Answer questions.`;
+            marksInstruction = `Each Long Answer question is worth exactly 5 marks. You MUST generate EXACTLY ${longQCount} questions. If there are marks left over, adjust the final question's marks to reach exactly ${totalMarks} total marks.`;
         } else {
-            // Aggressively strict instruction for specific types like "MCQ"
-            typeInstruction = `🚨 CRITICAL INSTRUCTION 🚨:
-You MUST generate a paper containing ONLY ${questionType} questions.
-DO NOT include Short Answer questions.
-DO NOT include Long Answer questions.
-DO NOT create different sections (like Section A, Section B). 
-EVERY SINGLE QUESTION must be of the type: ${questionType}.`;
+            typeInstruction = `Generate ONLY ${questionType} questions.`;
+            marksInstruction = `The total marks MUST equal exactly ${totalMarks}.`;
         }
         
         const prompt = `
 You are an experienced examination paper setter.
 
-Generate a ${difficulty} level question paper.
+Generate a ${difficulty} level question paper based ONLY on the Chapter Content provided below.
 
-The total marks MUST equal exactly ${totalMarks}.
-
+${marksInstruction}
 ${typeInstruction}
 
 Return ONLY valid JSON.
 Do NOT return markdown.
-Do NOT use backticks.
+Do NOT use backticks around the JSON.
 Do NOT explain the JSON.
-Do NOT use LaTeX.
-Do NOT use $.
 
 Return exactly this structure:
 {
-  "paperTitle":"",
-  "totalMarks":${totalMarks},
-  "questions":[]
+  "paperTitle": "Generated Test",
+  "totalMarks": ${totalMarks},
+  "questions": [
+    {
+      "questionText": "...",
+      "type": "${questionType === 'ALL' ? 'Type of question here (e.g. MCQ, Long Answer)' : questionType}", 
+      "options": ["...", "...", "...", "..."], // Include only if MCQ, otherwise empty array
+      "answer": "...",
+      "marks": 1
+    }
+  ]
 }
 
 Chapter Content
@@ -167,6 +185,7 @@ Chapter Content
         const aiResult = await model.generateContent(prompt);
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        
         if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
 
         res.json(JSON.parse(jsonMatch[0]));

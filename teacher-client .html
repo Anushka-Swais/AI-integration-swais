@@ -44,7 +44,13 @@
         <div class="controls">
             <button onclick="generateLessonPlan(this)">Generate Lesson Plan</button>
             
-            <div style="display:flex; align-items:center; gap:5px;">
+            <div style="display:flex; align-items:center; gap:5px; background: #fdfefe; padding: 5px; border: 1px solid #e1e8ed; border-radius: 6px;">
+                <select id="questionType" style="font-weight: bold;">
+                    <option value="ALL">Mixed Types</option>
+                    <option value="MCQ">MCQ Only</option>
+                    <option value="True/False">True/False Only</option>
+                    <option value="Short Answer">Short Answer Only</option>
+                </select>
                 <input type="number" id="exam-marks" value="20" placeholder="Total Marks" style="width: 80px;" title="Total Marks for the Exam">
                 <button onclick="generateQuestionPaper(this)">Generate Exam Paper</button>
             </div>
@@ -192,20 +198,27 @@
         }
     }
 
-    // Task 2: EXAM GENERATOR 
+    // Task 2: EXAM GENERATOR (UPDATED for Question Types)
     async function generateQuestionPaper(btn) {
         if(btn) btn.disabled = true;
         hideUI('core-ws', 'core-loading');
         try {
             const marksInput = document.getElementById('exam-marks').value || 20;
-            const data = await fetchWithLog('/question-paper', { chapterId: 1, totalMarks: parseInt(marksInput) });
+            const qType = document.getElementById('questionType').value || "ALL"; // Grab new dropdown value
+            
+            // Sending the questionType dynamically to backend
+            const data = await fetchWithLog('/question-paper', { 
+                chapterId: 1, 
+                totalMarks: parseInt(marksInput),
+                questionType: qType 
+            });
             
             let htmlContent = `<h3 style="color:#2c3e50; border-bottom:1px solid #ccc; padding-bottom:10px;">📝 ${data.paperTitle || 'Unit Test'}</h3>`;
-            htmlContent += `<p><strong>Total Marks:</strong> ${data.totalMarks}</p><div style="margin-top:20px;">`;
+            htmlContent += `<p><strong>Total Marks:</strong> ${data.totalMarks} | <strong>Type:</strong> ${qType}</p><div style="margin-top:20px;">`;
             if(data.questions && Array.isArray(data.questions)) {
                 data.questions.forEach((q, index) => {
-                    htmlContent += `<div style="margin-bottom: 20px;"><p style="margin-bottom: 5px;"><strong>Q${index + 1}. (${q.type} - ${q.marks} Marks)</strong><br>${q.question}</p>`;
-                    if (q.options && Array.isArray(q.options)) {
+                    htmlContent += `<div style="margin-bottom: 20px;"><p style="margin-bottom: 5px;"><strong>Q${index + 1}. (${q.type || qType} - ${q.marks || '1'} Marks)</strong><br>${q.question || q.questionText}</p>`;
+                    if (q.options && Array.isArray(q.options) && q.options.length > 0) {
                         htmlContent += `<ul style="margin-top: 5px; list-style-type: lower-alpha;">`;
                         q.options.forEach(opt => htmlContent += `<li>${opt}</li>`);
                         htmlContent += `</ul>`;
@@ -245,7 +258,7 @@
         }
     }
 
-    // VIRTUAL SLATE PROCESSOR (UPDATED TO SUPPORT LISTEN BUTTON)
+    // VIRTUAL SLATE PROCESSOR 
     async function processSlate(action, btn) {
         const rawText = document.getElementById('slate-text').value.trim();
         if(!rawText) return alert("Please enter some text on the virtual slate first.");
@@ -256,7 +269,6 @@
             const data = await fetchWithLog('/virtual-slate', { rawText, action });
             const formattedHTML = marked.parse(data.processedContent);
             
-            // Reusing the .msg-text class so our Google Voice function can read it!
             document.getElementById('slate-ws').innerHTML = `
                 <div class="msg-text">${formattedHTML}</div>
                 <button class="listen-btn" onclick="speakChat(this)" style="margin-top: 15px; font-size: 14px; padding: 8px 15px;">🔊 Listen to Output</button>
@@ -311,7 +323,7 @@
         }
     }
 
-    // Task 6: STUDENT ANALYTICS (With Subject Filtering)
+    // Task 6: STUDENT ANALYTICS
     let stuChart = null;
     async function loadStudentAnalytics(btn) {
         if(btn) btn.disabled = true;
@@ -350,7 +362,7 @@
         }
     }
 
-    // Task 7: CLASS ANALYTICS (With Subject Filtering)
+    // Task 7: CLASS ANALYTICS 
     let classChart = null;
     async function loadClassAnalytics(btn) {
         if(btn) btn.disabled = true;
@@ -385,7 +397,7 @@
         }
     }
 
-    // --- UPGRADED SMART MIC SYSTEM (Works for Chat AND Slate) ---
+    // --- UPGRADED SMART MIC SYSTEM ---
     const languageCodes = {
         "English": "en-US", "Telugu": "te-IN", "Hindi": "hi-IN",
         "Oriya": "or-IN", "Bengali": "bn-IN", "Marathi": "mr-IN",
@@ -422,7 +434,6 @@
 
     function toggleDictation(targetInputId, targetBtnId) { 
         if(recognition){ 
-            // If mic is running on a different button, reset it first
             if(recognitionBtn && recognitionBtn !== targetBtnId) {
                 resetMicBtn();
                 recognition.stop();
@@ -448,7 +459,6 @@
     async function speakChat(btnElement) { 
         window.speechSynthesis.cancel(); 
         
-        // Target the closest .msg-text div (works for both chat and slate!)
         const textToSpeak = btnElement.parentElement.querySelector('.msg-text').innerText;
         const selectedLang = document.getElementById('chat-lang').value;
         
@@ -471,7 +481,6 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "TTS failed");
 
-            // Play the audio generated from Google Cloud
             const audioStream = new Audio("data:audio/mp3;base64," + data.audioData);
             await audioStream.play();
 
