@@ -1,24 +1,23 @@
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
+import { logAIUsage } from '../utils/aiTracker.js';
 
-
-// Helper Function: Logs AI Usage to the Database
-const logAIUsage = async (userInfo = {}, featureUsed) => {
-    const { name = 'System Admin', email = 'admin@sgs.edu', role = 'Admin' } = userInfo;
-    try {
-        await pool.query(
-            `INSERT INTO ai_usage_logs (user_name, user_email, user_type, feature_used) 
-             VALUES ($1, $2, $3, $4)`,
-            [name, email, role, featureUsed]
-        );
-        console.log(`[LOG] Recorded ${featureUsed} usage by ${name}`);
-    } catch (err) {
-        console.error("Failed to log AI usage to database:", err);
-    }
+// Google Cloud Voice Mapping & Supported Dictionary
+const SUPPORTED_LANGUAGES = {
+    "English": "en-IN",
+    "Hindi": "hi-IN",
+    "Telugu": "te-IN",
+    "Kannada": "kn-IN",
+    "Tamil": "ta-IN",
+    "Malayalam": "ml-IN",
+    "Bengali": "bn-IN",
+    "Marathi": "mr-IN",
+    "Oriya": "hi-IN"
 };
 
 // Helper Function: Cleans formatting artifacts
 const cleanAIText = (text) => {
+    if (!text) return "";
     return text
         .replace(/\$\$/g, "")
         .replace(/\$/g, "")
@@ -37,8 +36,15 @@ const cleanAIText = (text) => {
 export const translateAdminText = async (req, res) => {
     const { text, targetLanguage, userInfo } = req.body;
     
-    if (!text?.trim() || !targetLanguage?.trim()) {
+    // Check if it's a batch translation (Array) or single translation (String)
+    const isBatch = Array.isArray(text);
+
+    if (!text || !targetLanguage?.trim()) {
         return res.status(400).json({ error: "Missing text or targetLanguage parameters" });
+    }
+
+    if (!isBatch && typeof text === 'string' && !text.trim()) {
+        return res.status(400).json({ error: "Text cannot be empty" });
     }
 
     // 🔒 SECURITY CHECK: Ensure the requested language is in your official dictionary
@@ -50,29 +56,74 @@ export const translateAdminText = async (req, res) => {
     }
 
     try {
-        await logAIUsage(userInfo, `Admin Translator (${targetLanguage})`);
-        
-        const prompt = `
-You are the SGS AI Translator for the School Administrator.
-Translate the following administrative text into ${targetLanguage}.
+        let prompt = "";
+        const usageLabel = isBatch ? `Admin Batch Translator (${targetLanguage})` : `Admin Translator (${targetLanguage})`;
 
-Requirements
+        if (isBatch) {
+            prompt = `
+You are the SGS AI Translator for the School Administrator.
+Translate the following JSON array of names, titles, or notices into ${targetLanguage}.
+
+Requirements:
+- Return ONLY a valid JSON array of strings containing the translations, in the EXACT same order.
+- For names (students/teachers), transliterate them so they sound the same in ${targetLanguage}.
+- Preserve dates and formatting.
+- Do not explain the translation.
+- Do not use Markdown outside of the JSON block.
+
+List to translate:
+${JSON.stringify(text)}
+`;
+        } else {
+            prompt = `
+You are the SGS AI Translator for the School Administrator.
+Translate the following name, title, or notice into ${targetLanguage}.
+
+Requirements:
 - Return ONLY the translated text.
-- Preserve names, dates, and formatting.
+- If it is a person's name, transliterate it accurately so it sounds the same in ${targetLanguage}.
+- Preserve dates and formatting.
 - Do not explain the translation.
 - Do not use Markdown, HTML, or LaTeX.
 
-Administrative Text:
+Text to translate:
 "${text}"
 `;
+        }
 
         const aiResult = await model.generateContent(prompt);
-        const responseText = aiResult.text || aiResult.response.text(); 
         
-        res.json({ 
-            translation: cleanAIText(responseText),
-            languageCode: SUPPORTED_LANGUAGES[targetLanguage] // Sends the code back to the frontend for Audio/TTS features!
-        });
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Admin Dashboard", 
+            usageLabel, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
+        const responseText = aiResult.text || aiResult.response?.text(); 
+        const cleanedText = cleanAIText(responseText);
+
+        // Return Data Based on Input Type
+        if (isBatch) {
+            let translatedArray = [];
+            try {
+                translatedArray = JSON.parse(cleanedText);
+            } catch (e) {
+                // Fallback: If AI fails to return JSON, split by newlines
+                translatedArray = cleanedText.split('\n').map(line => line.replace(/^[-*]\s*/, '').trim()).filter(Boolean);
+            }
+            return res.json({ 
+                translations: translatedArray,
+                languageCode: SUPPORTED_LANGUAGES[targetLanguage]
+            });
+        } else {
+            return res.json({ 
+                translation: cleanedText,
+                languageCode: SUPPORTED_LANGUAGES[targetLanguage] 
+            });
+        }
+
     } catch (err) {
         console.error("🚨 ADMIN TRANSLATOR CRASH:", err);
         res.status(500).json({ error: "Translation failed", details: err.message });
@@ -90,8 +141,6 @@ export const formatVoiceTranscription = async (req, res) => {
     }
 
     try {
-        await logAIUsage(userInfo, "Admin Voice-to-Text Formatting");
-
         const prompt = `
 You are the SGS AI Assistant for the School Administrator. 
 Take the following raw, unformatted speech-to-text transcription and format it into clean, professional administrative text with proper punctuation and capitalization. 
@@ -106,7 +155,16 @@ Raw Audio Text:
 `;
 
         const aiResult = await model.generateContent(prompt);
-        const formattedText = aiResult.text || aiResult.response.text();
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Admin Dashboard", 
+            "Admin Voice-to-Text Formatting", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
+        const formattedText = aiResult.text || aiResult.response?.text();
 
         res.json({ formattedText: cleanAIText(formattedText) });
     } catch (err) {

@@ -1,3 +1,4 @@
+import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
 import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
@@ -20,21 +21,6 @@ const googleVoiceMap = {
     "Oriya": { languageCode: "or-IN", name: "or-IN-Standard-A" }
 };
 
-// Helper Function: Logs AI Usage to the Database
-const logAIUsage = async (userInfo = {}, featureUsed) => {
-    const { name = 'Unknown Parent', email = 'unknown@parent.com', role = 'Parent' } = userInfo;
-    try {
-        await pool.query(
-            `INSERT INTO ai_usage_logs (user_name, user_email, user_type, feature_used) 
-             VALUES ($1, $2, $3, $4)`,
-            [name, email, role, featureUsed]
-        );
-        console.log(`[LOG] Recorded ${featureUsed} usage by ${name}`);
-    } catch (err) {
-        console.error("Failed to log AI usage to database:", err);
-    }
-};
-
 // ==========================================
 // 1. ASSIGNMENT TRACKER REPORT (Live Database Query)
 // ==========================================
@@ -43,8 +29,6 @@ export const getAssignmentReport = async (req, res) => {
     const parentId = userInfo?.id || 1;
 
     try {
-        await logAIUsage(userInfo, "Parent Assignment Report");
-
         // 🔥 Live Database Query using Parent-Student Mapping
         const dbResult = await pool.query(`
             SELECT a.assessment_type AS subject, a.title AS task, a.assessment_date AS due,
@@ -100,6 +84,15 @@ IMPORTANT FORMAT RULES
 `;
 
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Parent Dashboard", 
+            "Parent Assignment Report", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ report: aiResult.text, list: assignments });
     } catch (err) {
         console.error("🚨 ASSIGNMENT REPORT CRASH:", err);
@@ -115,8 +108,6 @@ export const getParentAnalytics = async (req, res) => {
     const parentId = userInfo?.id || 1;
 
     try {
-        await logAIUsage(userInfo, "Parent Progress Analytics");
-
         let dbResult;
         let mockData = [];
 
@@ -186,6 +177,15 @@ IMPORTANT FORMAT RULES
 `;
 
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Parent Dashboard", 
+            "Parent Progress Analytics", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.status(200).json({ analysis: aiResult.text, chartData: mockData });
 
     } catch (err) {
@@ -211,8 +211,6 @@ export const translateForParent = async (req, res) => {
     if (!text || !targetLanguage) return res.status(400).json({ error: "Text and language required" });
 
     try {
-        await logAIUsage(userInfo, "Parent Translator");
-
         const prompt = `
 Translate the following school communication into ${targetLanguage}.
 
@@ -233,6 +231,15 @@ School Communication
 `;
 
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Parent Dashboard", 
+            "Parent Translator", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ translation: aiResult.text.trim() });
     } catch (err) {
         console.error("🚨 TRANSLATOR CRASH:", err);
@@ -244,7 +251,8 @@ School Communication
 // 5. GOOGLE CLOUD TEXT-TO-SPEECH (For Parent Notices/Remarks)
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
-    const { text, language = "English" } = req.body;
+    // ✅ NEW: Added userInfo extraction here
+    const { text, language = "English", userInfo } = req.body;
 
     if (!text) {
         return res.status(400).json({ error: "Text is required for speech synthesis" });
@@ -261,6 +269,9 @@ export const handleTextToSpeech = async (req, res) => {
 
         const [response] = await ttsClient.synthesizeSpeech(request);
         const audioBase64 = response.audioContent.toString('base64');
+
+        // ✅ NEW: Log the TTS feature without tokens
+        await logAIUsage(userInfo, "Parent Dashboard", "Text-to-Speech (Listen)", null);
 
         res.json({
             status: "success",

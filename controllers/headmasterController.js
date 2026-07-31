@@ -1,20 +1,6 @@
+import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
-
-// Helper Function: Logs AI Usage to the Database
-const logAIUsage = async (userInfo = {}, featureUsed) => {
-    const { name = 'Principal', email = 'admin@sgs.edu', role = 'Headmaster' } = userInfo;
-    try {
-        await pool.query(
-            `INSERT INTO ai_usage_logs (user_name, user_email, user_type, feature_used) 
-             VALUES ($1, $2, $3, $4)`,
-            [name, email, role, featureUsed]
-        );
-        console.log(`[LOG] Recorded ${featureUsed} usage by ${name}`);
-    } catch (err) {
-        console.error("Failed to log AI usage to database:", err);
-    }
-};
 
 const cleanAIText = (text) => {
     return text
@@ -35,8 +21,6 @@ const cleanAIText = (text) => {
 export const getAssignmentReport = async (req, res) => {
     const { userInfo } = req.body;
     try {
-        await logAIUsage(userInfo, "School-Wide Assignment Report");
-
         // 🔥 Live Database Query: Aggregate all school results
         const dbResult = await pool.query(`
             SELECT 
@@ -85,6 +69,15 @@ IMPORTANT FORMAT RULES
 `;
          
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Headmaster Dashboard", 
+            "School-Wide Assignment Report", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ report: cleanAIText(aiResult.text)});
     } catch (err) {
         console.error("🚨 HEADMASTER ASSIGNMENT CRASH:", err);
@@ -92,15 +85,13 @@ IMPORTANT FORMAT RULES
     }
 };
 
-
+// ==========================================
 // 2, 3, 4, 5. UNIFIED ACADEMIC ANALYTICS ENGINE (From DB)
-
+// ==========================================
 export const getAcademicAnalytics = async (req, res) => {
     const { targetName, targetType, scope, userInfo } = req.body; 
     
     try {
-        await logAIUsage(userInfo, `Academic Analytics (${targetType} - ${scope})`);
-
         let mockData = [];
         let promptContext = "";
 
@@ -178,13 +169,22 @@ IMPORTANT FORMAT RULES
 `;
   
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Headmaster Dashboard", 
+            `Academic Analytics (${targetType} - ${scope})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ analysis: cleanAIText(aiResult.text), chartData: mockData });
     } catch (err) {
         console.error("🚨 HEADMASTER ANALYTICS CRASH:", {
-    message: err.message,
-    status: err.status,
-    stack: err.stack
-});
+            message: err.message,
+            status: err.status,
+            stack: err.stack
+        });
         res.status(500).json({ error: "Failed to run academic analytics", details: err.message });
     }
 };
@@ -195,8 +195,6 @@ IMPORTANT FORMAT RULES
 export const getTeacherPerformance = async (req, res) => {
     const { userInfo } = req.body;
     try {
-        await logAIUsage(userInfo, "Teacher Performance Review");
-
         // 🔥 Live Database Query: Counts how many assessments each teacher has generated
         const dbResult = await pool.query(`
             SELECT u.full_name AS name, COUNT(a.assessment_id) AS assessments_created
@@ -246,6 +244,15 @@ IMPORTANT FORMAT RULES
 `;
  
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Headmaster Dashboard", 
+            "Teacher Performance Review", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ report: cleanAIText(aiResult.text) });
     } catch (err) {
         console.error("🚨 TEACHER KPI CRASH:", err);
@@ -260,14 +267,12 @@ export const translateForHeadmaster = async (req, res) => {
     const { text, targetLanguage, userInfo } = req.body;
     
     if (!text?.trim() || !targetLanguage?.trim()) {
-    return res.status(400).json({
-        error: "Missing parameters"
-    });
-}
+        return res.status(400).json({
+            error: "Missing parameters"
+        });
+    }
 
     try {
-        await logAIUsage(userInfo, "Headmaster Translator");
-        
         const prompt = `
 Translate the following official school communication into ${targetLanguage}.
 
@@ -287,6 +292,15 @@ Official School Communication
 `;
 
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Headmaster Dashboard", 
+            "Headmaster Translator", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ translation: cleanAIText(aiResult.text)});
     } catch (err) {
         console.error("🚨 TRANSLATOR CRASH:", err);

@@ -1,3 +1,4 @@
+import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
 import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
@@ -20,23 +21,6 @@ const googleVoiceMap = {
     "Oriya": { languageCode: "or-IN", name: "or-IN-Standard-A" }
 };
 
-// Helper Function: Logs AI Usage to the Database
-const logAIUsage = async (userInfo = {}, featureUsed) => {
-    const { name = 'Unknown Student', email = 'unknown@sgs.edu', role = 'Student' } = userInfo;
-
-    try {
-        await pool.query(
-            `INSERT INTO ai_usage_logs (user_name, user_email, user_type, feature_used)
-             VALUES ($1, $2, $3, $4)`,
-            [name, email, role, featureUsed]
-        );
-
-        console.log(`[LOG] Recorded ${featureUsed} usage by ${name}`);
-    } catch (err) {
-        console.error("Failed to log AI usage to database:", err);
-    }
-};
-
 // ==========================================
 // 1. STUDENT AI CHAT (Saves to ai_chat_messages)
 // ==========================================
@@ -49,8 +33,6 @@ export const handleStudentChat = async (req, res) => {
     }
 
     try {
-        await logAIUsage(userInfo, "Student AI Tutor Chat");
-
         // Save student's message
         await pool.query(
             `INSERT INTO ai_chat_messages
@@ -95,6 +77,14 @@ Student's message:
         const aiResult = await model.generateContent(prompt);
         const aiReply = aiResult.text;
 
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes to capture tokens
+        await logAIUsage(
+            userInfo, 
+            "Student Dashboard", 
+            "Student AI Tutor Chat", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata 
+        );
+
         // Save AI reply
         await pool.query(
             `INSERT INTO ai_chat_messages
@@ -121,19 +111,13 @@ Student's message:
 // 2. AUTO QUIZ GENERATOR
 // ==========================================
 export const generateAutoQuiz = async (req, res) => {
-
     const { chapterId, userInfo } = req.body;
 
     if (!chapterId) {
-        return res.status(400).json({
-            error: "Chapter ID is required",
-        });
+        return res.status(400).json({ error: "Chapter ID is required" });
     }
 
     try {
-
-        await logAIUsage(userInfo, "Generate Practice Quiz");
-
         const result = await pool.query(
             `SELECT full_text_content
              FROM sgs_chapter_content
@@ -142,9 +126,7 @@ export const generateAutoQuiz = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({
-                error: "Chapter content not found in database",
-            });
+            return res.status(404).json({ error: "Chapter content not found in database" });
         }
 
         const content = result.rows[0].full_text_content;
@@ -165,7 +147,6 @@ Rules:
 - Do NOT use $ or $$.
 
 JSON format:
-
 {
   "quiz": [
     {
@@ -178,27 +159,30 @@ JSON format:
 }
 
 Chapter:
-
 "${content}"
 `;
 
         const aiResult = await model.generateContent(prompt);
 
-        let rawText = aiResult.text;
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Student Dashboard", 
+            "Auto Quiz Generator", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
 
+        let rawText = aiResult.text;
         const cleanedText = rawText
             .replace(/```json/gi, "")
             .replace(/```/g, "")
             .trim();
 
         const quizData = JSON.parse(cleanedText);
-
         res.json(quizData);
 
     } catch (err) {
-
         console.error("🚨 QUIZ GENERATOR CRASH:", err);
-
         res.status(500).json({
             error: "Failed to generate quiz",
             details: err.message,
@@ -210,15 +194,10 @@ Chapter:
 // 3. STUDENT PERFORMANCE ANALYTICS
 // ==========================================
 export const getStudentAnalytics = async (req, res) => {
-
     const { userInfo } = req.body;
-
     const studentId = userInfo?.id || 1;
 
     try {
-
-        await logAIUsage(userInfo, "Student Self-Assessment");
-
         const gradesResult = await pool.query(
             `
             SELECT
@@ -238,20 +217,10 @@ export const getStudentAnalytics = async (req, res) => {
         let grades = gradesResult.rows;
 
         if (grades.length === 0) {
-
             grades = [
-                {
-                    test_name: "Midterm Exam",
-                    score: 75,
-                },
-                {
-                    test_name: "Algebra Quiz",
-                    score: 82,
-                },
-                {
-                    test_name: "Science Project",
-                    score: 88,
-                },
+                { test_name: "Midterm Exam", score: 75 },
+                { test_name: "Algebra Quiz", score: 82 },
+                { test_name: "Science Project", score: 88 }
             ];
         }
 
@@ -276,11 +245,18 @@ Formatting rules:
 - Plain text only
 
 Student data:
-
 ${JSON.stringify(grades)}
 `;
 
         const aiResult = await model.generateContent(prompt);
+
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Student Dashboard", 
+            "Student Self-Assessment Analytics", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
 
         res.json({
             status: "success",
@@ -289,9 +265,7 @@ ${JSON.stringify(grades)}
         });
 
     } catch (err) {
-
         console.error("🚨 ANALYTICS CRASH:", err);
-
         res.status(500).json({
             error: "Failed to generate analytics",
             details: err.message,
@@ -303,19 +277,13 @@ ${JSON.stringify(grades)}
 // 4. PACED CONTENT GENERATOR
 // ==========================================
 export const generatePacedContent = async (req, res) => {
-
     const { chapterId, pace, userInfo } = req.body;
 
     if (!chapterId || !pace) {
-        return res.status(400).json({
-            error: "Chapter ID and pace are required",
-        });
+        return res.status(400).json({ error: "Chapter ID and pace are required" });
     }
 
     try {
-
-        await logAIUsage(userInfo, `Paced Content (${pace})`);
-
         const result = await pool.query(
             `SELECT full_text_content
              FROM sgs_chapter_content
@@ -324,24 +292,18 @@ export const generatePacedContent = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({
-                error: "Chapter not found",
-            });
+            return res.status(404).json({ error: "Chapter not found" });
         }
 
         const content = result.rows[0].full_text_content;
-
         let promptModifier = "";
 
         if (pace === "small") {
-            promptModifier =
-                "Summarize this into a very short, bite-sized paragraph. Keep it extremely brief.";
+            promptModifier = "Summarize this into a very short, bite-sized paragraph. Keep it extremely brief.";
         } else if (pace === "average") {
-            promptModifier =
-                "Explain this clearly in 2 to 3 standard paragraphs. Make it easy to read for a normal learning pace.";
+            promptModifier = "Explain this clearly in 2 to 3 standard paragraphs. Make it easy to read for a normal learning pace.";
         } else if (pace === "quick") {
-            promptModifier =
-                "Create a rapid-fire, bullet-point cheat sheet of only the most crucial facts. Optimize for a fast learner who wants to skim.";
+            promptModifier = "Create a rapid-fire, bullet-point cheat sheet of only the most crucial facts. Optimize for a fast learner who wants to skim.";
         }
 
         const prompt = `
@@ -374,14 +336,20 @@ Wrong:
 
         const aiResult = await model.generateContent(prompt);
 
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Student Dashboard", 
+            `Adaptive Learning (${pace})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({
             generatedContent: aiResult.text,
         });
 
     } catch (err) {
-
         console.error("🚨 PACED CONTENT CRASH:", err);
-
         res.status(500).json({
             error: "Failed to generate paced content",
             details: err.message,
@@ -393,7 +361,7 @@ Wrong:
 // 5. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
-    const { text, language = "English" } = req.body;
+    const { text, language = "English", userInfo } = req.body;
 
     if (!text) {
         return res.status(400).json({ error: "Text is required for speech synthesis" });
@@ -410,6 +378,9 @@ export const handleTextToSpeech = async (req, res) => {
 
         const [response] = await ttsClient.synthesizeSpeech(request);
         const audioBase64 = response.audioContent.toString('base64');
+
+        // ✅ NEW: Log the TTS feature. It doesn't use Gemini tokens, so we omit the token parameter!
+        await logAIUsage(userInfo, "Student Dashboard", "Text-to-Speech (Listen)", null);
 
         res.json({
             status: "success",

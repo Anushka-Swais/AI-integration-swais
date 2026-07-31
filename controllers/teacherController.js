@@ -1,3 +1,4 @@
+import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
 import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
@@ -22,22 +23,9 @@ const googleVoiceMap = {
     "Sanskrit": "hi-IN" // Sanskrit reads best using the Hindi TTS engine
 };
 
-// Helper Function: Logs AI Usage to the Database
-const logAIUsage = async (userInfo = {}, featureUsed) => {
-    const { name = 'Unknown Teacher', email = 'unknown@sgs.edu', role = 'Teacher' } = userInfo;
-    try {
-        await pool.query(
-            `INSERT INTO ai_usage_logs (user_name, user_email, user_type, feature_used) 
-             VALUES ($1, $2, $3, $4)`,
-            [name, email, role, featureUsed]
-        );
-        console.log(`[LOG] Recorded ${featureUsed} usage by ${name}`);
-    } catch (err) {
-        console.error("Failed to log AI usage to database:", err);
-    }
-};
-
+// ==========================================
 // 1. AUTO LESSON PLANNER
+// ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { chapterId, durationMinutes = 45, userInfo } = req.body;
     const teacherId = userInfo?.id || 3; 
@@ -45,8 +33,6 @@ export const generateLessonPlan = async (req, res) => {
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        await logAIUsage(userInfo, "Generate Lesson Plan");
-        
         const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
@@ -90,6 +76,14 @@ IMPORTANT FORMAT RULES
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Generate Lesson Plan", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
@@ -103,15 +97,15 @@ IMPORTANT FORMAT RULES
     }
 };
 
+// ==========================================
 // 2. AUTO QUESTION PAPER GENERATOR 
+// ==========================================
 export const generateQuestionPaper = async (req, res) => {
     const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body;
     
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        await logAIUsage(userInfo, `Generate Exam Paper (${questionType})`);
-
         const result = await pool.query('SELECT full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
@@ -121,7 +115,6 @@ export const generateQuestionPaper = async (req, res) => {
         let marksInstruction = "";
         const typeUpper = questionType.toUpperCase();
 
-        // 🔥 UPDATED: "ALL" now strictly includes Long Answers and gives a mark distribution guide
         if (typeUpper === "ALL") {
             typeInstruction = `Generate a balanced exam paper containing a mix of ALL the following types: 
 1. Multiple Choice (MCQ)
@@ -141,7 +134,6 @@ export const generateQuestionPaper = async (req, res) => {
             typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions. Do not include MCQs or True/False.`;
             marksInstruction = `Each Short Answer question is worth exactly 2 marks. You MUST generate EXACTLY ${shortQCount} questions. If there is 1 mark left over, make the final question worth 3 marks to reach exactly ${totalMarks} total marks.`;
         } else if (typeUpper === "LONG ANSWER") {
-            // Added this just in case you want a "Long Answer Only" option later!
             const longQCount = Math.floor(totalMarks / 5);
             typeInstruction = `🚨 CRITICAL: Generate ONLY Long Answer questions.`;
             marksInstruction = `Each Long Answer question is worth exactly 5 marks. You MUST generate EXACTLY ${longQCount} questions. If there are marks left over, adjust the final question's marks to reach exactly ${totalMarks} total marks.`;
@@ -171,7 +163,7 @@ Return exactly this structure:
     {
       "questionText": "...",
       "type": "${questionType === 'ALL' ? 'Type of question here (e.g. MCQ, Long Answer)' : questionType}", 
-      "options": ["...", "...", "...", "..."], // Include only if MCQ, otherwise empty array
+      "options": ["...", "...", "...", "..."], 
       "answer": "...",
       "marks": 1
     }
@@ -183,6 +175,15 @@ Chapter Content
 `;
         
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            `Generate Exam Paper (${questionType})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         
@@ -195,14 +196,14 @@ Chapter Content
     }
 };
 
+// ==========================================
 // 3. AUTO ANSWER SHEET CORRECTOR 
+// ==========================================
 export const autoCorrectAnswer = async (req, res) => {
     const { question, studentAnswer, maxMarks, rubric, userInfo } = req.body;
     if (!question || !studentAnswer || !maxMarks || !rubric) return res.status(400).json({ error: "Missing required fields" });
 
     try {
-        await logAIUsage(userInfo, "Grade Sample Answer");
-
         const prompt = `
 You are an experienced school examiner.
 
@@ -233,6 +234,15 @@ Return
 `;
 
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Auto Answer Sheet Corrector", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         
@@ -243,12 +253,12 @@ Return
     }
 };
 
-// 4. ASSIGNMENT DUE DATE ALERTS (Missing/Pending Tracker)
+// ==========================================
+// 4. ASSIGNMENT DUE DATE ALERTS 
+// ==========================================
 export const generateAssignmentReminders = async (req, res) => {
     const { userInfo } = req.body;
     try {
-        await logAIUsage(userInfo, "Generate Assignment Reminders");
-
         const dbResult = await pool.query(`
             SELECT s.full_name AS student, a.title AS task, a.assessment_date AS due
             FROM sgs_assessment_results ar
@@ -278,6 +288,15 @@ Do not use code blocks.
 `;
 
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Assignment Due Date Alerts", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ reminderEmail: aiResult.text, list: missingAssignments });
     } catch (err) {
         console.error("🚨 DUE DATE ALERTS CRASH:", err);
@@ -285,15 +304,14 @@ Do not use code blocks.
     }
 };
 
+// ==========================================
 // 5. ASSIGNMENT COMPLETION ALERTS
+// ==========================================
 export const getAssignmentCompletionAlerts = async (req, res) => {
     const { userInfo } = req.body;
     const teacherId = userInfo?.id || 3;
 
     try {
-        await logAIUsage(userInfo, "View Completion Alerts");
-
-        // Query database for submitted assignments and calculate completion metrics
         const dbResult = await pool.query(`
             SELECT a.title AS task, COUNT(ar.student_id) as total_submitted, ROUND(AVG(ar.percentage), 2) as avg_score
             FROM sgs_assessment_results ar
@@ -326,6 +344,15 @@ Plain text only.
 `;
         
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Assignment Completion Alerts", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ completionAlert: aiResult.text, data: completions });
     } catch (err) {
         console.error("🚨 COMPLETION ALERTS CRASH:", err);
@@ -333,15 +360,15 @@ Plain text only.
     }
 };
 
+// ==========================================
 // 6. VIRTUAL SLATE AI PROCESSOR 
+// ==========================================
 export const processVirtualSlateContent = async (req, res) => {
     const { rawText, action = "format", userInfo } = req.body;
     
     if (!rawText) return res.status(400).json({ error: "Virtual slate text is required." });
 
     try {
-        await logAIUsage(userInfo, `Virtual Slate: ${action}`);
-        
         let instruction = action === "summarize" 
             ? "Summarize these rough virtual slate notes clearly." 
             : "Format these rough virtual slate notes into clean, structured bullet points for students.";
@@ -368,6 +395,15 @@ Formatting Rules
 `;
 
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            `Virtual Slate (${action})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ processedContent: aiResult.text });
     } catch (err) {
         console.error("🚨 VIRTUAL SLATE CRASH:", err);
@@ -375,12 +411,12 @@ Formatting Rules
     }
 };
 
-// 7 & 8. STUDENT ANALYTICS
+// ==========================================
+// 7. STUDENT ANALYTICS
+// ==========================================
 export const getSingleStudentAnalytics = async (req, res) => {
     const { studentName = "Aarav", subject = "all", userInfo } = req.body;
     try {
-        await logAIUsage(userInfo, `View Student Analytics (${subject})`);
-
         let query = `
             SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
             FROM sgs_assessment_results ar
@@ -427,6 +463,15 @@ No $ symbols.
 `;
 
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            `Student Analytics (${subject})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ analysis: aiResult.text, chartData: studentData });
     } catch (err) {
         console.error("🚨 STUDENT ANALYTICS CRASH:", err);
@@ -434,14 +479,14 @@ No $ symbols.
     }
 };
 
-// 7 & 8. CLASS PERFORMANCE ANALYTICS
+// ==========================================
+// 8. CLASS PERFORMANCE ANALYTICS
+// ==========================================
 export const getClassAnalytics = async (req, res) => {
     const { subject = "all", userInfo } = req.body;
     const teacherId = userInfo?.id || 3;
 
     try {
-        await logAIUsage(userInfo, `View Class Analytics (${subject})`);
-
         let query = `
             SELECT s.full_name AS student, ROUND(AVG(ar.percentage), 2) AS overall_score
             FROM sgs_assessment_results ar
@@ -485,6 +530,15 @@ No $.
 `;
     
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            `Class Analytics (${subject})`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ analyticsReport: aiResult.text, data: classData });
     } catch (err) {
         console.error("🚨 CLASS ANALYTICS CRASH:", err);
@@ -492,14 +546,14 @@ No $.
     }
 };
 
+// ==========================================
 // 9 & 10. LANGUAGE TRANSLATOR 
+// ==========================================
 export const translateText = async (req, res) => {
     const { text, targetLanguage, userInfo } = req.body;
     if (!text || !targetLanguage) return res.status(400).json({ error: "Text and target language required" });
 
     try {
-        await logAIUsage(userInfo, "Translate Text");
-        
         const prompt = `
 Translate the following text into ${targetLanguage}.
 
@@ -516,6 +570,15 @@ Text
 `;
         
         const aiResult = await model.generateContent(prompt);
+        
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            `Language Translator`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         res.json({ translation: aiResult.text.trim() });
     } catch (err) {
         console.error("🚨 TRANSLATION CRASH:", err);
@@ -523,20 +586,16 @@ Text
     }
 };
 
-// 11. UNIFIED TEACHER CHATBOT (UPGRADED WITH AUTO LANGUAGE DETECTION)
+// ==========================================
+// 11. UNIFIED TEACHER CHATBOT 
+// ==========================================
 export const teacherChatbot = async (req, res) => {
-    // UPDATED: targetLanguage parameter has been removed completely
     const { message, userInfo } = req.body; 
-    
-    // Use the user's ID to fetch their specific chat history
     const userId = userInfo?.id || 3; 
 
     if (!message) return res.status(400).json({ error: "Message is required" });
 
     try {
-        await logAIUsage(userInfo, "Teacher AI Chatbot");
-
-        // 1. Fetch the last 10 messages from the database to build "Memory"
         const historyResult = await pool.query(
             `SELECT role, message_content FROM (
                 SELECT role, message_content, created_at 
@@ -548,13 +607,11 @@ export const teacherChatbot = async (req, res) => {
             [userId]
         );
 
-        // Format history exactly how Gemini expects it
         const chatHistory = historyResult.rows.map(row => ({
             role: row.role === 'ai' ? 'model' : 'user', 
             parts: [{ text: row.message_content }]
         }));
 
-        // 2. Initialize Gemini with STRICT Language & Script Rules
         const prompt = `
 You are SGS AI Teacher Assistant.
 
@@ -588,17 +645,22 @@ IMPORTANT RESPONSE RULES:
 - Use headings and bullet points where helpful.
 `;
     
-        // 3. Save the user's NEW message to the database
         await pool.query(
             `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'user', message]
         );
 
-        // 4. Send the message to Gemini
         const aiResult = await model.generateContent(prompt);
         const aiReply = aiResult.text;
 
-        // 5. Save the AI's reply back to the database
+        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Teacher AI Chatbot", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
         await pool.query(
             `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'ai', aiReply]
@@ -612,40 +674,30 @@ IMPORTANT RESPONSE RULES:
 };
 
 // ==========================================
-// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER (STRICT VOICE MAPPING)
+// 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER 
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
-    const { text, language = "English" } = req.body;
+    const { text, language = "English", userInfo } = req.body; // Added userInfo here
 
     if (!text) {
         return res.status(400).json({ error: "Text is required for speech synthesis" });
     }
 
     try {
-        // 1. Default to English
         let finalLangCode = "en-IN";
         let finalVoiceName = "en-IN-Neural2-B"; 
 
-        // 2. 🔥 SMART SCRIPT DETECT + EXACT VOICE NAMES
-        // Google Cloud REQUIRES the exact 'name' for regional languages to work properly.
         if (/[\u0C00-\u0C7F]/.test(text)) { 
-            // Telugu Detected
             finalLangCode = "te-IN"; finalVoiceName = "te-IN-Standard-A"; 
         } else if (/[\u0C80-\u0CFF]/.test(text)) { 
-            // Kannada Detected
             finalLangCode = "kn-IN"; finalVoiceName = "kn-IN-Standard-A"; 
         } else if (/[\u0D00-\u0D7F]/.test(text)) { 
-            // Malayalam Detected
             finalLangCode = "ml-IN"; finalVoiceName = "ml-IN-Standard-A"; 
         } else if (/[\u0980-\u09FF]/.test(text)) { 
-            // Bengali Detected
             finalLangCode = "bn-IN"; finalVoiceName = "bn-IN-Standard-A"; 
         } else if (/[\u0B80-\u0BFF]/.test(text)) { 
-            // Tamil Detected
             finalLangCode = "ta-IN"; finalVoiceName = "ta-IN-Standard-A"; 
         } else if (/[\u0900-\u097F]/.test(text)) { 
-            // Devanagari Detected (Shared by Hindi & Marathi)
-            // If the user selected Marathi in the dropdown, force Marathi voice
             if (language === "Marathi") {
                 finalLangCode = "mr-IN"; finalVoiceName = "mr-IN-Standard-A";
             } else {
@@ -653,7 +705,6 @@ export const handleTextToSpeech = async (req, res) => {
             }
         }
 
-        // 3. Send BOTH languageCode and name to prevent crashes
         const request = {
             input: { text: text },
             voice: { languageCode: finalLangCode, name: finalVoiceName }, 
@@ -662,6 +713,9 @@ export const handleTextToSpeech = async (req, res) => {
 
         const [response] = await ttsClient.synthesizeSpeech(request);
         
+        // ✅ NEW: Log the TTS feature without tokens
+        await logAIUsage(userInfo, "Teacher Dashboard", "Text-to-Speech (Listen)", null);
+
         res.json({
             status: "success",
             audioData: response.audioContent.toString('base64')
