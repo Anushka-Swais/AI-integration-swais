@@ -7,6 +7,10 @@ import {
     handleTextToSpeech // ADDED THIS IMPORT
 } from '../controllers/studentController.js';
 
+import { generateCompetitiveContent } from '../controllers/competitiveController.js';
+import { postDoubt, getCommunityDoubts, answerDoubt } from '../controllers/communityController.js';
+
+
 const router = express.Router();
 
 // 💬 Student Chat Endpoint
@@ -23,5 +27,13 @@ router.post('/generate-content', generatePacedContent);
 
 // 🔊 Google Cloud Text-to-Speech Endpoint (ADDED THIS ROUTE)
 router.post('/speak', handleTextToSpeech);
+
+// Competitive Exam Route (Used by both Student and Teacher dashboards)
+router.post('/competitive/generate', generateCompetitiveContent);
+
+// Community Doubt Forum Routes
+router.post('/community/doubt', postDoubt);          // Ask a doubt
+router.get('/community/doubts', getCommunityDoubts); // View all doubts feed
+router.post('/community/answer', answerDoubt);       // Answer a doubt
 
 export default router;

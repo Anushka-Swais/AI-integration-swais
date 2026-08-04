@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGS@school API Local Tester</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
+        h1 { text-align: center; color: #2c3e50; }
+        .container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; min-width: 400px; }
+        h2 { border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; color: #2980b9; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; margin-top: 15px; cursor: pointer; font-weight: bold; width: 100%; }
+        button:hover { background-color: #2980b9; }
+        .output { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; margin-top: 15px; min-height: 100px; max-height: 300px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
+        .divider { margin: 30px 0; border: 0; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 SGS@school Local API Tester</h1>
+
+    <div class="container">
+        <div class="card">
+            <h2>1. Competitive Exam Prep</h2>
+            
+            <label>Exam Target</label>
+            <select id="examTarget" onchange="updateSubjects()">
+                <option value="NEET">NEET</option>
+                <option value="IIT JEE">IIT JEE</option>
+                <option value="UPSC">UPSC</option>
+                <option value="Olympiad">Olympiad</option>
+                <option value="RRB">RRB</option>
+            </select>
+
+            <label>Class Level (Restricts AI Logic)</label>
+            <input type="number" id="classLevel" value="8">
+
+            <label>Subject</label>
+            <select id="subject" onchange="updateTopics()"></select>
+
+            <label>Topic</label>
+            <select id="topic"></select>
+
+            <label>Content Type</label>
+            <select id="contentType">
+                <option value="MockTest">Mock Test (JSON - 15 Qs)</option>
+                <option value="PracticeQuestions">Practice Questions (JSON - 5 Qs)</option>
+                <option value="PrepMaterial">Prep Material (Text Notes)</option>
+            </select>
+
+            <button onclick="testCompetitiveAPI()">Generate Content</button>
+            <div id="competitiveOutput" class="output">Waiting for request...</div>
+        </div>
+
+        <div class="card">
+            <h2>2. Community Doubt Forum</h2>
+            
+            <h3>A. Ask a Doubt</h3>
+            <input type="text" id="doubtSubject" placeholder="Subject (e.g. Math)" value="Math">
+            <textarea id="doubtText" rows="3" placeholder="Type your doubt here..."></textarea>
+            <button onclick="postDoubt()" style="background-color: #e67e22;">Post Doubt</button>
+            
+            <hr class="divider">
+
+            <h3>B. View Doubts Feed</h3>
+            <button onclick="getDoubts()" style="background-color: #27ae60;">Load Recent Doubts</button>
+            
+            <hr class="divider">
+
+            <h3>C. Answer a Doubt</h3>
+            <input type="number" id="answerDoubtId" placeholder="Doubt ID (from feed)">
+            <textarea id="answerText" rows="2" placeholder="Write the solution..."></textarea>
+            <button onclick="answerDoubt()" style="background-color: #8e44ad;">Submit Answer</button>
+
+            <div id="communityOutput" class="output">Waiting for request...</div>
+        </div>
+    </div>
+
+    <script>
+        // 🚨 CRITICAL: Change this to your local server port
+        const API_BASE_URL = "http://localhost:5000/api/v1"; 
+        const dummyUser = { id: 1, role: "teacher", name: "Local Tester" };
+
+        // --- DYNAMIC DICTIONARIES ---
+        const examSubjectMap = {
+            "NEET": ["Physics", "Chemistry", "Biology"],
+            "IIT JEE": ["Physics", "Chemistry", "Mathematics"],
+            "UPSC": ["History", "Geography", "Polity", "General Science", "Logical Reasoning"],
+            "Olympiad": ["Mathematics", "Science", "Cyber", "English"],
+            "RRB": ["General Awareness", "Mathematics", "General Intelligence"]
+        };
+
+        // ✅ NEW: Topic Mapping Dictionary
+        const subjectTopicMap = {
+            "Physics": ["Kinematics", "Thermodynamics", "Electromagnetism", "Optics", "Work, Energy & Power"],
+            "Chemistry": ["Organic Chemistry", "Chemical Bonding", "States of Matter", "Atomic Structure"],
+            "Biology": ["Human Physiology", "Genetics", "Plant Kingdom", "Cell Biology"],
+            "Mathematics": ["Algebra", "Calculus", "Trigonometry", "Coordinate Geometry", "Probability"],
+            "History": ["Ancient India", "Medieval India", "Modern Indian History", "World History"],
+            "Geography": ["Physical Geography", "Indian Geography", "World Geography"],
+            "Polity": ["Constitution", "Parliament", "Judiciary", "Fundamental Rights"],
+            "General Science": ["Physics Basics", "Chemistry Basics", "Biology Basics"],
+            "Logical Reasoning": ["Puzzles", "Seating Arrangement", "Syllogism", "Blood Relations"],
+            "Science": ["Physics", "Chemistry", "Biology"],
+            "Cyber": ["Networking", "Hardware", "Logic Gates", "Internet Security"],
+            "English": ["Grammar", "Vocabulary", "Reading Comprehension"],
+            "General Awareness": ["Current Affairs", "Static GK", "Indian Economy"],
+            "General Intelligence": ["Analogies", "Coding-Decoding", "Number Series"]
+        };
+
+        // --- UI UPDATE FUNCTIONS ---
+        function updateSubjects() {
+            const selectedExam = document.getElementById("examTarget").value;
+            const subjectDropdown = document.getElementById("subject");
+            
+            subjectDropdown.innerHTML = ""; // Clear
+            
+            const subjects = examSubjectMap[selectedExam] || ["General Studies"];
+            subjects.forEach(sub => {
+                const opt = document.createElement("option");
+                opt.value = sub;
+                opt.innerHTML = sub;
+                subjectDropdown.appendChild(opt);
+            });
+
+            // ✅ Instantly trigger the topic update so it doesn't get left behind
+            updateTopics(); 
+        }
+
+        function updateTopics() {
+            const selectedSubject = document.getElementById("subject").value;
+            const topicDropdown = document.getElementById("topic");
+            
+            topicDropdown.innerHTML = ""; // Clear
+            
+            const topics = subjectTopicMap[selectedSubject] || ["General Concepts"];
+            topics.forEach(top => {
+                const opt = document.createElement("option");
+                opt.value = top;
+                opt.innerHTML = top;
+                topicDropdown.appendChild(opt);
+            });
+        }
+
+        // Initialize both dropdowns properly on page load
+        window.onload = updateSubjects;
+
+        // --- 1. COMPETITIVE EXAM TESTER ---
+        async function testCompetitiveAPI() {
+            const outputBox = document.getElementById("competitiveOutput");
+            outputBox.innerHTML = "⏳ AI is generating content... Please wait.";
+
+            const payload = {
+                examTarget: document.getElementById("examTarget").value,
+                classLevel: document.getElementById("classLevel").value,
+                subject: document.getElementById("subject").value,
+                topic: document.getElementById("topic").value, // Now pulls from dropdown!
+                contentType: document.getElementById("contentType").value,
+                userInfo: dummyUser
+            };
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/competitive/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                outputBox.innerHTML = JSON.stringify(data, null, 2);
+            } catch (err) {
+                outputBox.innerHTML = "🚨 Error connecting to server: " + err.message;
+            }
+        }
+
+        // --- 2. COMMUNITY FORUM TESTERS ---
+        async function postDoubt() {
+            const outputBox = document.getElementById("communityOutput");
+            const payload = {
+                studentId: 123,
+                classLevel: document.getElementById("classLevel").value,
+                subject: document.getElementById("doubtSubject").value,
+                doubtText: document.getElementById("doubtText").value,
+                userInfo: dummyUser
+            };
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/community/doubt`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
+            } catch (err) {
+                outputBox.innerHTML = "🚨 Error: " + err.message;
+            }
+        }
+
+        async function getDoubts() {
+            const outputBox = document.getElementById("communityOutput");
+            try {
+                const res = await fetch(`${API_BASE_URL}/community/doubts`);
+                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
+            } catch (err) {
+                outputBox.innerHTML = "🚨 Error: " + err.message;
+            }
+        }
+
+        async function answerDoubt() {
+            const outputBox = document.getElementById("communityOutput");
+            const payload = {
+                doubtId: document.getElementById("answerDoubtId").value,
+                answeredById: 1,
+                answeredByRole: "Teacher",
+                answerText: document.getElementById("answerText").value,
+                userInfo: dummyUser
+            };
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/community/answer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
+            } catch (err) {
+                outputBox.innerHTML = "🚨 Error: " + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
