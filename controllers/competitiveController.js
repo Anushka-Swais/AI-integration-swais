@@ -39,9 +39,13 @@ Your material must include:
 
 Do NOT use Markdown code blocks or LaTeX. Write math in plain text.
 `;
-        } else if (contentType === "MockTest" || contentType === "PracticeQuestions") {
+        } else if (contentType === "MockTest" || contentType === "PracticeQuestions" || contentType === "Quiz") {
             isJsonExpected = true;
-            const questionCount = contentType === "MockTest" ? 15 : 5;
+            
+            // Assign question counts based on the type
+            let questionCount = 5; // Default for Practice Questions
+            if (contentType === "MockTest") questionCount = 15;
+            if (contentType === "Quiz") questionCount = 10;
             
             prompt = `
 You are an expert ${examTarget} paper setter for Class ${classLevel}.
@@ -49,10 +53,15 @@ Generate exactly ${questionCount} multiple-choice questions for ${subject} on th
 
 ${classGuardrail}
 
-Return ONLY valid JSON. Structure exactly like this:
+🚨 CRITICAL INSTRUCTION: Return ONLY valid JSON. 
+Do NOT include markdown formatting. Do NOT use \`\`\`json. 
+Do NOT write any conversational text, warnings, or notes before or after the JSON.
+
+Return EXACTLY this structure:
 {
   "exam": "${examTarget}",
   "subject": "${subject}",
+  "topic": "${topic}",
   "classLevel": "${classLevel}",
   "questions": [
     {
