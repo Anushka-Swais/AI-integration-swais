@@ -102,36 +102,39 @@ IMPORTANT FORMAT RULES
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body;
+    const teacherId = userInfo?.id || 3; 
     
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        const result = await pool.query('SELECT full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const content = result.rows[0].full_text_content;
+        const chapterName = result.rows[0].chapter_name || `Chapter ${chapterId}`;
         
         let typeInstruction = "";
         let marksInstruction = "";
         const typeUpper = questionType.toUpperCase();
 
         if (typeUpper === "ALL") {
-            typeInstruction = `Generate a balanced exam paper containing a mix of ALL the following types: 
+            typeInstruction = `🚨 CRITICAL: You MUST generate a balanced exam paper containing a strict mix of ALL 4 types: 
 1. Multiple Choice (MCQ)
 2. True/False
 3. Short Answer
-4. Long Answer`;
-            marksInstruction = `The sum of the marks for all questions MUST equal exactly ${totalMarks}. Distribute the marks logically: MCQs and True/False should be 1 mark each, Short Answers should be 2 to 3 marks each, and Long Answers should be 4 to 5 marks each.`;
+4. Long Answer
+You MUST include at least one question from EACH of the 4 types.`;
+            marksInstruction = `The sum of the marks for all questions MUST equal exactly ${totalMarks}. Distribute the marks logically: MCQs and True/False = 1 mark each, Short Answers = 2 marks each, and Long Answers = 4 to 5 marks each.`;
         
         } else if (typeUpper === "MCQ") {
             typeInstruction = `🚨 CRITICAL: Generate ONLY Multiple Choice Questions (MCQs). Do not include any other question types.`;
-            marksInstruction = `Each MCQ is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions to reach the ${totalMarks} total marks.`;
+            marksInstruction = `Each MCQ is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions.`;
         } else if (typeUpper === "TRUE/FALSE" || typeUpper === "TRUE FALSE") {
             typeInstruction = `🚨 CRITICAL: Generate ONLY True or False questions. Do not include any other question types.`;
-            marksInstruction = `Each True/False question is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions to reach the ${totalMarks} total marks.`;
+            marksInstruction = `Each True/False question is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions.`;
         } else if (typeUpper === "SHORT ANSWER") {
             const shortQCount = Math.floor(totalMarks / 2); 
-            typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions. Do not include MCQs or True/False.`;
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions. Do not include MCQs or True/False. Short answers MUST be single-line answers or a maximum of two sentences.`;
             marksInstruction = `Each Short Answer question is worth exactly 2 marks. You MUST generate EXACTLY ${shortQCount} questions. If there is 1 mark left over, make the final question worth 3 marks to reach exactly ${totalMarks} total marks.`;
         } else if (typeUpper === "LONG ANSWER") {
             const longQCount = Math.floor(totalMarks / 5);
@@ -149,6 +152,10 @@ Generate a ${difficulty} level question paper based ONLY on the Chapter Content 
 
 ${marksInstruction}
 ${typeInstruction}
+
+GLOBAL RULES:
+- NEVER use the phrase "According to Textbook", "Based on the text", or "According to the chapter" in the questions. Write them as independent, objective questions.
+- For ANY Short Answer questions generated, the expected answer MUST be a single line.
 
 Return ONLY valid JSON.
 Do NOT return markdown.
@@ -176,7 +183,7 @@ Chapter Content
         
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        // ✅ Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard", 
@@ -189,7 +196,16 @@ Chapter Content
         
         if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
 
-        res.json(JSON.parse(jsonMatch[0]));
+        const generatedPaper = JSON.parse(jsonMatch[0]);
+
+        // ✅ NEW: Save the generated quiz to the Assessment table as a 'Draft'
+        await pool.query(
+            `INSERT INTO sgs_assessments (teacher_id, title, assessment_type, assessment_category, assessment_date, total_marks, publish_status, created_at)
+             VALUES ($1, $2, $3, 'Academic', CURRENT_DATE, $4, 'Draft', CURRENT_TIMESTAMP)`,
+            [teacherId, `AI Auto Test: ${chapterName}`, questionType, totalMarks]
+        );
+
+        res.json(generatedPaper);
     } catch (err) {
         console.error("🚨 EXAM CRASH:", err);
         res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
