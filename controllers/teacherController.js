@@ -226,12 +226,17 @@ Chapter Content
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        // 🔥 CRITICAL FIX: Bulletproof JSON Extraction (Ignores backticks/markdown completely)
+        let rawText = aiResult.text;
+        const startIndex = rawText.indexOf('{');
+        const endIndex = rawText.lastIndexOf('}');
         
-        if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
-
-        const generatedPaper = JSON.parse(jsonMatch[0]);
+        if (startIndex === -1 || endIndex === -1) {
+            throw new Error("AI did not return a valid JSON format. Raw output: " + rawText);
+        }
+        
+        const jsonString = rawText.substring(startIndex, endIndex + 1);
+        const generatedPaper = JSON.parse(jsonString);
 
         // ✅ NEW: Save the generated quiz to the Assessment table as a 'Draft'
         await pool.query(
@@ -294,10 +299,18 @@ Return
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        // 🔥 CRITICAL FIX: Applied to corrector as well!
+        let rawText = aiResult.text;
+        const startIndex = rawText.indexOf('{');
+        const endIndex = rawText.lastIndexOf('}');
         
-        res.json(JSON.parse(jsonMatch[0]));
+        if (startIndex === -1 || endIndex === -1) {
+            throw new Error("AI did not return a valid JSON format. Raw output: " + rawText);
+        }
+        
+        const jsonString = rawText.substring(startIndex, endIndex + 1);
+        res.json(JSON.parse(jsonString));
+
     } catch (err) {
         console.error("🚨 CORRECTOR CRASH:", err);
         res.status(500).json({ error: "Failed to correct answer.", details: err.message });
