@@ -116,33 +116,65 @@ export const generateQuestionPaper = async (req, res) => {
         let typeInstruction = "";
         let marksInstruction = "";
         const typeUpper = questionType.toUpperCase();
+        const tMarks = Number(totalMarks);
 
-        if (typeUpper === "ALL") {
-            typeInstruction = `🚨 CRITICAL: You MUST generate a balanced exam paper containing a strict mix of ALL 4 types: 
-1. Multiple Choice (MCQ)
-2. True/False
-3. Short Answer
-4. Long Answer
-You MUST include at least one question from EACH of the 4 types.`;
-            marksInstruction = `The sum of the marks for all questions MUST equal exactly ${totalMarks}. Distribute the marks logically: MCQs and True/False = 1 mark each, Short Answers = 2 marks each, and Long Answers = 4 to 5 marks each.`;
+        // 🧠 Dynamic Math Engine for AI Prompting
+        if (typeUpper === "ALL" || typeUpper === "MIXED") {
+            // Calculate proportional split for Mixed Types
+            let mcqCount = Math.max(1, Math.round(tMarks * 0.10));
+            let tfCount = Math.max(1, Math.round(tMarks * 0.10));
+            let fibCount = Math.max(1, Math.round(tMarks * 0.10));
+            let shortCount = Math.max(1, Math.floor((tMarks * 0.30) / 2));
+            
+            let marksSoFar = (mcqCount * 1) + (tfCount * 1) + (fibCount * 1) + (shortCount * 2);
+            let remainingMarks = tMarks - marksSoFar;
+            
+            let longCount = Math.max(1, Math.floor(remainingMarks / 4));
+            let lastLongMarks = remainingMarks - ((longCount - 1) * 4); 
+
+            typeInstruction = `🚨 CRITICAL: Generate a balanced exam paper containing exactly these 5 types:
+1. ${mcqCount} Multiple Choice (MCQ) Questions
+2. ${tfCount} True/False Questions
+3. ${fibCount} Fill in the Blanks Questions
+4. ${shortCount} Short Answer Questions
+5. ${longCount} Long Answer Questions`;
+
+            marksInstruction = `Assign marks EXACTLY as follows to reach ${tMarks} marks:
+- MCQs: 1 mark each
+- True/False: 1 mark each
+- Fill in the Blanks: 1 mark each
+- Short Answers: 2 marks each
+- Long Answers: ${longCount - 1} questions worth 4 marks each, and 1 final Long Answer question worth ${lastLongMarks} marks.
+TOTAL SUM MUST BE EXACTLY ${tMarks}.`;
         
-        } else if (typeUpper === "MCQ") {
+        } else if (["MCQ", "QUIZ"].includes(typeUpper)) {
             typeInstruction = `🚨 CRITICAL: Generate ONLY Multiple Choice Questions (MCQs). Do not include any other question types.`;
-            marksInstruction = `Each MCQ is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions.`;
-        } else if (typeUpper === "TRUE/FALSE" || typeUpper === "TRUE FALSE") {
+            marksInstruction = `Each MCQ is worth exactly 1 mark. You MUST generate EXACTLY ${tMarks} questions.`;
+            
+        } else if (["TRUE/FALSE", "TRUE FALSE", "TRUE-FALSE"].includes(typeUpper)) {
             typeInstruction = `🚨 CRITICAL: Generate ONLY True or False questions. Do not include any other question types.`;
-            marksInstruction = `Each True/False question is worth exactly 1 mark. You MUST generate EXACTLY ${totalMarks} questions.`;
-        } else if (typeUpper === "SHORT ANSWER") {
-            const shortQCount = Math.floor(totalMarks / 2); 
-            typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions. Do not include MCQs or True/False. Short answers MUST be single-line answers or a maximum of two sentences.`;
-            marksInstruction = `Each Short Answer question is worth exactly 2 marks. You MUST generate EXACTLY ${shortQCount} questions. If there is 1 mark left over, make the final question worth 3 marks to reach exactly ${totalMarks} total marks.`;
-        } else if (typeUpper === "LONG ANSWER") {
-            const longQCount = Math.floor(totalMarks / 5);
+            marksInstruction = `Each True/False question is worth exactly 1 mark. You MUST generate EXACTLY ${tMarks} questions.`;
+            
+        } else if (["FILL IN THE BLANKS", "FIB"].includes(typeUpper)) {
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Fill in the Blanks questions. Do not include any other question types.`;
+            marksInstruction = `Each Fill in the Blanks question is worth exactly 1 mark. You MUST generate EXACTLY ${tMarks} questions.`;
+            
+        } else if (["SHORT ANSWER", "SHORT Q/A", "SHORT"].includes(typeUpper)) {
+            const shortQCount = Math.floor(tMarks / 2); 
+            const remainder = tMarks % 2;
+            const lastMarks = 2 + remainder;
+            typeInstruction = `🚨 CRITICAL: Generate ONLY Short Answer questions.`;
+            marksInstruction = `You MUST generate EXACTLY ${shortQCount} questions. ${shortQCount - 1} questions must be worth 2 marks each, and the final question must be worth ${lastMarks} marks to equal exactly ${tMarks} total marks.`;
+            
+        } else if (["LONG ANSWER", "LONG Q/A", "LONG"].includes(typeUpper)) {
+            const longQCount = Math.max(1, Math.floor(tMarks / 4));
+            const lastMarks = tMarks - ((longQCount - 1) * 4);
             typeInstruction = `🚨 CRITICAL: Generate ONLY Long Answer questions.`;
-            marksInstruction = `Each Long Answer question is worth exactly 5 marks. You MUST generate EXACTLY ${longQCount} questions. If there are marks left over, adjust the final question's marks to reach exactly ${totalMarks} total marks.`;
+            marksInstruction = `You MUST generate EXACTLY ${longQCount} questions. ${longQCount - 1} questions must be worth 4 marks each, and the final question must be worth ${lastMarks} marks to equal exactly ${tMarks} total marks.`;
+            
         } else {
             typeInstruction = `Generate ONLY ${questionType} questions.`;
-            marksInstruction = `The total marks MUST equal exactly ${totalMarks}.`;
+            marksInstruction = `The total marks MUST equal exactly ${tMarks}.`;
         }
         
         const prompt = `
@@ -155,7 +187,10 @@ ${typeInstruction}
 
 GLOBAL RULES:
 - NEVER use the phrase "According to Textbook", "Based on the text", or "According to the chapter" in the questions. Write them as independent, objective questions.
-- For ANY Short Answer questions generated, the expected answer MUST be a single line.
+- For Short Answer questions, the expected answer MUST be a single line and NOT exceed 180 characters.
+- For Long Answer questions, the expected answer MUST NOT exceed 2000 characters.
+- For Fill in the Blanks, use "_____" to denote the blank space.
+- Leave the "options" array empty [] for True/False, Fill in the Blanks, Short Answers, and Long Answers.
 
 Return ONLY valid JSON.
 Do NOT return markdown.
@@ -165,11 +200,11 @@ Do NOT explain the JSON.
 Return exactly this structure:
 {
   "paperTitle": "Generated Test",
-  "totalMarks": ${totalMarks},
+  "totalMarks": ${tMarks},
   "questions": [
     {
       "questionText": "...",
-      "type": "${questionType === 'ALL' ? 'Type of question here (e.g. MCQ, Long Answer)' : questionType}", 
+      "type": "MCQ | True/False | Fill in the Blanks | Short Answer | Long Answer", 
       "options": ["...", "...", "...", "..."], 
       "answer": "...",
       "marks": 1
@@ -202,7 +237,7 @@ Chapter Content
         await pool.query(
             `INSERT INTO sgs_assessments (teacher_id, title, assessment_type, assessment_category, assessment_date, total_marks, publish_status, created_at)
              VALUES ($1, $2, $3, 'Academic', CURRENT_DATE, $4, 'Draft', CURRENT_TIMESTAMP)`,
-            [teacherId, `AI Auto Test: ${chapterName}`, questionType, totalMarks]
+            [teacherId, `AI Auto Test: ${chapterName}`, questionType, tMarks]
         );
 
         res.json(generatedPaper);
@@ -693,7 +728,7 @@ IMPORTANT RESPONSE RULES:
 // 12. GOOGLE CLOUD TEXT-TO-SPEECH CONTROLLER 
 // ==========================================
 export const handleTextToSpeech = async (req, res) => {
-    const { text, language = "English", userInfo } = req.body; // Added userInfo here
+    const { text, language = "English", userInfo } = req.body; 
 
     if (!text) {
         return res.status(400).json({ error: "Text is required for speech synthesis" });
