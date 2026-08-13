@@ -115,7 +115,7 @@ export const generateQuestionPaper = async (req, res) => {
         
         let typeInstruction = "";
         let marksInstruction = "";
-        const typeUpper = questionType.toUpperCase();
+        const typeUpper = (questionType || "ALL").toUpperCase();
         const tMarks = Number(totalMarks);
 
         // 🧠 Dynamic Math Engine for AI Prompting
