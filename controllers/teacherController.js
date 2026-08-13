@@ -101,7 +101,8 @@ IMPORTANT FORMAT RULES
 // 2. AUTO QUESTION PAPER GENERATOR 
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
-    const { chapterId, difficulty = "Medium", totalMarks = 20, questionType, userInfo } = req.body || {};
+    // 🔒 Destructure with default values to prevent undefined errors
+    const { chapterId, difficulty = "Medium", totalMarks = 20, questionType = "ALL", userInfo } = req.body || {};
     const teacherId = userInfo?.id || 3; 
     
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
@@ -116,9 +117,11 @@ export const generateQuestionPaper = async (req, res) => {
         let typeInstruction = "";
         let marksInstruction = "";
         
-        // 🔒 Bulletproof handling against null, undefined, or unexpected types
-        const rawType = (questionType || "ALL").toString();
+        // 🔒 Bulletproof handling against null, undefined, or array/object types
+        // Using String() safely converts null/undefined/objects without throwing an error
+        const rawType = questionType ? String(questionType) : "ALL";
         const typeUpper = rawType.trim().toUpperCase();
+        
         const tMarks = Number(totalMarks) || 20;
 
         // 🧠 Dynamic Math Engine for AI Prompting
@@ -131,8 +134,11 @@ export const generateQuestionPaper = async (req, res) => {
             let marksSoFar = (mcqCount * 1) + (tfCount * 1) + (fibCount * 1) + (shortCount * 2);
             let remainingMarks = tMarks - marksSoFar;
             
-            let longCount = Math.max(1, Math.floor(remainingMarks / 4));
+            // Safeguard against negative remaining marks if tMarks is very low
+            let longCount = Math.max(1, Math.floor(Math.max(remainingMarks, 0) / 4));
             let lastLongMarks = remainingMarks - ((longCount - 1) * 4); 
+            // Ensure last question is at least worth something if math gets weird on low numbers
+            if (lastLongMarks < 1) lastLongMarks = 4;
 
             typeInstruction = `🚨 CRITICAL: Generate a balanced exam paper containing exactly these 5 types:
 1. ${mcqCount} Multiple Choice (MCQ) Questions
@@ -172,7 +178,7 @@ TOTAL SUM MUST BE EXACTLY ${tMarks}.`;
             const longQCount = Math.max(1, Math.floor(tMarks / 4));
             const lastMarks = tMarks - ((longQCount - 1) * 4);
             typeInstruction = `🚨 CRITICAL: Generate ONLY Long Answer questions.`;
-            marksInstruction = `You MUST generate EXACTLY ${longQCount} questions. ${longQCount - 1} questions must be worth 4 marks each, and the final question must be worth ${lastMarks} marks to equal exactly ${tMarks} total marks.`;
+            marksInstruction = `You MUST generate EXACTLY ${longQCount} questions. ${longQCount - 1} questions must be worth 4 marks each, and the final question must be worth ${lastMarks > 0 ? lastMarks : 4} marks to equal exactly ${tMarks} total marks.`;
             
         } else {
             typeInstruction = `Generate ONLY ${typeUpper} questions.`;
@@ -220,16 +226,27 @@ Chapter Content
         
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ Log AI Usage
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Generate Exam Paper (${typeUpper})`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        // ✅ Log AI Usage safely 
+        const usageData = aiResult?.usageMetadata || aiResult?.response?.usageMetadata || null;
+        if (typeof logAIUsage === 'function') {
+            await logAIUsage(
+                userInfo, 
+                "Teacher Dashboard", 
+                `Generate Exam Paper (${typeUpper})`, 
+                usageData
+            );
+        }
 
-        // 🔥 Bulletproof JSON Extraction
-        const rawText = aiResult.text || "";
+        // 🔥 Bulletproof JSON Extraction (Handles different SDK wrapper variations)
+        let rawText = "";
+        if (aiResult?.response && typeof aiResult.response.text === 'function') {
+            rawText = aiResult.response.text(); // Google AI standard SDK
+        } else if (typeof aiResult.text === 'function') {
+            rawText = aiResult.text(); 
+        } else {
+            rawText = aiResult?.text || aiResult?.response?.text || ""; // Fallback
+        }
+
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         
         if (!jsonMatch) {
