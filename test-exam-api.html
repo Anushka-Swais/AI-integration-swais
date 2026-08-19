@@ -3,206 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGS@school - AI Exam Generator Tester</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Weekly Test API Tester</title>
     <style>
-        .loader {
-            border-top-color: #3b82f6;
-            -webkit-animation: spinner 1.5s linear infinite;
-            animation: spinner 1.5s linear infinite;
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            padding: 20px; 
+            max-width: 700px; 
+            margin: auto; 
+            background-color: #f9fafb;
+            color: #333;
         }
-        @keyframes spinner {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+        h2 { margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input[type="text"], input[type="number"] { 
+            width: 100%; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button { 
+            padding: 10px 20px; 
+            background-color: #2563eb; 
+            color: white; 
+            border: none; 
+            border-radius: 4px;
+            cursor: pointer; 
+            font-weight: bold;
+            width: 100%;
+        }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        pre { 
+            background-color: #1f2937; 
+            color: #10b981;
+            padding: 15px; 
+            overflow-x: auto; 
+            border-radius: 4px;
+            min-height: 100px;
+        }
+        #status { font-weight: bold; margin-bottom: 10px; }
+        .error { color: #dc2626; }
+        .success { color: #16a34a; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen p-6">
+<body>
 
-    <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        <div class="md:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div class="flex items-center space-x-2 mb-6">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">AI</div>
-                <h2 class="text-xl font-bold text-gray-800">Exam Generator</h2>
-            </div>
-            
-            <form id="examForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Chapter ID</label>
-                    <input type="number" id="chapterId" value="1" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                    <p class="text-xs text-gray-400 mt-1">Must match an ID in sgs_chapter_content</p>
-                </div>
+    <div class="container">
+        <h2>🧪 Test 'generateWeeklyTest' API</h2>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Question Type</label>
-                    <select id="questionType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                        <option value="ALL">ALL (Mixed Types)</option>
-                        <option value="MCQ">MCQ Only</option>
-                        <option value="TRUE/FALSE">True/False Only</option>
-                        <option value="SHORT ANSWER">Short Answer Only</option>
-                        <option value="LONG ANSWER">Long Answer Only</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Marks</label>
-                    <input type="number" id="totalMarks" value="20" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
-                    <select id="difficulty" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                        <option value="Easy">Easy</option>
-                        <option value="Medium" selected>Medium</option>
-                        <option value="Hard">Hard</option>
-                    </select>
-                </div>
-
-                <button type="submit" id="submitBtn" 
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center space-x-2 mt-4">
-                    <span>Generate AI Test</span>
-                </button>
-            </form>
+        <div class="form-group">
+            <label for="apiUrl">API Endpoint URL:</label>
+            <!-- Change 3000 to whatever port your Express server is running on -->
+            <input type="text" id="apiUrl" value="http://localhost:3000/api/teacher/weekly-test">
         </div>
 
-        <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Generated Question Paper</h2>
-            
-            <div id="loadingState" class="hidden flex-1 flex flex-col items-center justify-center text-gray-500">
-                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
-                <p class="font-medium animate-pulse">AI is writing the exam paper...</p>
-                <p class="text-sm mt-2 text-gray-400">Strictly following formatting rules...</p>
-            </div>
-
-            <div id="errorState" class="hidden p-4 bg-red-50 text-red-600 rounded-lg border border-red-100">
-                <strong>Error: </strong> <span id="errorMsg"></span>
-            </div>
-
-            <div id="resultsOutput" class="hidden flex-1 overflow-y-auto">
-                <div class="flex justify-between items-center mb-6 bg-blue-50 p-4 rounded-lg">
-                    <h3 id="paperTitle" class="text-lg font-bold text-blue-900"></h3>
-                    <span id="paperMarks" class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold"></span>
-                </div>
-                
-                <div id="questionsContainer" class="space-y-6">
-                    </div>
-            </div>
-            
-            <div id="emptyState" class="flex-1 flex items-center justify-center text-gray-400">
-                Select your parameters and click Generate to see the magic.
-            </div>
+        <div class="form-group">
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" placeholder="e.g., Computer Science" value="Computer Science">
         </div>
+
+        <div class="form-group">
+            <label for="chapterId">Chapter ID (Must exist in your database):</label>
+            <input type="number" id="chapterId" placeholder="e.g., 1" value="1">
+        </div>
+
+        <div class="form-group">
+            <label for="totalMarks">Total Marks:</label>
+            <input type="number" id="totalMarks" placeholder="e.g., 20" value="20">
+        </div>
+
+        <button id="generateBtn" onclick="testAPI()">Generate Weekly Test</button>
+
+        <h3 style="margin-top: 30px;">Server Response:</h3>
+        <div id="status">Waiting to start...</div>
+        <pre id="output">No data yet...</pre>
     </div>
 
     <script>
-        // ⚠️ UPDATE THIS URL TO MATCH YOUR LOCAL EXPRESS BACKEND PORT & ROUTE
-        const API_URL = "http://localhost:5000/api/v1/ai/teacher/question-paper"; 
+        async function testAPI() {
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
 
-        const form = document.getElementById('examForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const loadingState = document.getElementById('loadingState');
-        const errorState = document.getElementById('errorState');
-        const resultsOutput = document.getElementById('resultsOutput');
-        const emptyState = document.getElementById('emptyState');
-        
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // UI States
-            emptyState.classList.add('hidden');
-            errorState.classList.add('hidden');
-            resultsOutput.classList.add('hidden');
-            loadingState.classList.remove('hidden');
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            const apiUrl = document.getElementById('apiUrl').value;
+            const subject = document.getElementById('subject').value;
+            const chapterId = document.getElementById('chapterId').value;
+            const totalMarks = document.getElementById('totalMarks').value;
 
-            const payload = {
-                chapterId: parseInt(document.getElementById('chapterId').value),
-                questionType: document.getElementById('questionType').value,
-                totalMarks: parseInt(document.getElementById('totalMarks').value),
-                difficulty: document.getElementById('difficulty').value,
-                userInfo: { id: 3, name: 'Local Test Teacher', role: 'Teacher' } // Mock user info
-            };
+            // UI update: disable button and show loading state
+            btn.disabled = true;
+            status.innerHTML = "⏳ Sending request to server... AI is generating.";
+            status.className = "";
+            output.textContent = "";
 
             try {
-                const response = await fetch(API_URL, {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subject: subject,
+                        chapterId: parseInt(chapterId),
+                        totalMarks: parseInt(totalMarks),
+                        userInfo: { id: 3, role: "teacher" } // Mocked user info to prevent crash
+                    })
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || data.details || 'Failed to connect to API');
+                    throw new Error(data.error || `HTTP Error ${response.status}`);
                 }
 
-                renderPaper(data);
+                // UI update: Success
+                status.innerHTML = "✅ Success!";
+                status.className = "success";
+                // Pretty-print the JSON output
+                output.textContent = JSON.stringify(data, null, 2);
 
-            } catch (err) {
-                document.getElementById('errorMsg').textContent = err.message;
-                errorState.classList.remove('hidden');
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                
+                // UI update: Error
+                status.innerHTML = "❌ Error occurred. Check your server terminal!";
+                status.className = "error";
+                output.textContent = error.message;
             } finally {
-                loadingState.classList.add('hidden');
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                // Re-enable button
+                btn.disabled = false;
             }
-        });
-
-        function renderPaper(data) {
-            resultsOutput.classList.remove('hidden');
-            
-            document.getElementById('paperTitle').textContent = data.paperTitle || "Assessment";
-            document.getElementById('paperMarks').textContent = `Total Marks: ${data.totalMarks}`;
-            
-            const container = document.getElementById('questionsContainer');
-            container.innerHTML = '';
-
-            data.questions.forEach((q, index) => {
-                let optionsHTML = '';
-                
-                // Render MCQ/TrueFalse options cleanly
-                if (q.options && q.options.length > 0 && !q.options.every(opt => opt === "")) {
-                    optionsHTML = `<ul class="mt-3 space-y-2">`;
-                    q.options.forEach(opt => {
-                        // Highlight the correct option in green
-                        const isCorrect = opt === q.answer;
-                        const bgClass = isCorrect ? 'bg-green-50 border-green-200 text-green-800' : 'bg-gray-50 border-gray-200';
-                        const checkIcon = isCorrect ? '✓ ' : '';
-                        
-                        optionsHTML += `<li class="px-4 py-2 border rounded-md text-sm ${bgClass}">${checkIcon}${opt}</li>`;
-                    });
-                    optionsHTML += `</ul>`;
-                }
-
-                const questionBlock = `
-                    <div class="p-5 border border-gray-200 rounded-lg hover:border-blue-300 transition shadow-sm">
-                        <div class="flex justify-between items-start mb-2">
-                            <h4 class="font-bold text-gray-800 text-base">
-                                <span class="text-blue-600 mr-1">Q${index + 1}.</span> ${q.questionText}
-                            </h4>
-                            <span class="ml-4 flex-shrink-0 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                ${q.marks} Mark(s)
-                            </span>
-                        </div>
-                        <span class="inline-block text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded mb-3">
-                            ${q.type}
-                        </span>
-                        
-                        ${optionsHTML}
-                        
-                        <div class="mt-4 pt-3 border-t border-dashed border-gray-200">
-                            <span class="text-xs font-bold text-gray-500 uppercase">Expected Answer:</span>
-                            <p class="text-sm font-medium text-gray-700 mt-1">${q.answer}</p>
-                        </div>
-                    </div>
-                `;
-                
-                container.innerHTML += questionBlock;
-            });
         }
     </script>
 </body>

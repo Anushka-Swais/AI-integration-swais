@@ -16,6 +16,9 @@ import {
 import { generateCompetitiveContent } from '../controllers/competitiveController.js';
 import { postDoubt, getCommunityDoubts, answerDoubt } from '../controllers/communityController.js';
 
+import { generateWeeklyTest } from '../controllers/yourControllerFile.js';
+
+
 const router = express.Router();
 
 // 1. Auto Content Generation
@@ -46,5 +49,8 @@ router.post('/competitive/generate', generateCompetitiveContent);
 router.post('/community/doubt', postDoubt);          // Ask a doubt
 router.get('/community/doubts', getCommunityDoubts); // View all doubts feed
 router.post('/community/answer', answerDoubt);       // Answer a doubt
+
+// Weekly test report
+router.post('/generate-weekly-test', generateWeeklyTest);
 
 export default router;
