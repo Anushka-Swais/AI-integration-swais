@@ -27,16 +27,7 @@ const googleVoiceMap = {
 // 1. AUTO LESSON PLANNER
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
-    // Added specificTopic, customObjectives, and specialNotes from your UI
-    const { 
-        chapterId, 
-        durationMinutes = 45, 
-        userInfo, 
-        specificTopic, 
-        customObjectives, 
-        specialNotes 
-    } = req.body;
-    
+    const { chapterId, durationMinutes = 45, userInfo } = req.body;
     const teacherId = userInfo?.id || 3; 
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
@@ -47,78 +38,74 @@ export const generateLessonPlan = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // Use the specific topic if provided, otherwise default to chapter name
-        const displayTopic = specificTopic ? specificTopic : chapter_name;
-
+        // ✨ UPDATED PROMPT WITH NEW STRUCTURE ✨
         const prompt = `
 You are an expert curriculum developer and senior school teacher.
 
-Create a concise, classroom-ready lesson plan for:
-
-Class: 8th Standard
-Subject: Social Studies
-Board/Syllabus: AP State Syllabus
-Topic: "${displayTopic}"
-Duration: ${durationMinutes} Minutes
+Create a concise, classroom-ready lesson plan for the topic: "${chapter_name}" with a duration of ${durationMinutes} Minutes.
 
 Use ONLY the following textbook content to create the lesson plan:
 "${full_text_content}"
 
-${customObjectives ? `IMPORTANT CUSTOM OBJECTIVES: Please ensure the following custom objectives are met in the plan: ${customObjectives}` : ""}
-${specialNotes ? `SPECIAL INSTRUCTIONS: Please incorporate these special notes into the activities/strategies: ${specialNotes}` : ""}
-
 IMPORTANT:
-The lesson plan must follow EXACTLY the structure and style below. 
+The lesson plan must follow EXACTLY the structure below. You must use these exact headings in this exact order.
 
-Lesson Plan: ${displayTopic}
+Lesson Information
+Topic: ${chapter_name}
+Duration: ${durationMinutes} Minutes
 
-Lesson Metadata
-Class: 8th Standard
-Topic: ${displayTopic}
-Duration: ${durationMinutes} Minutes 
-Subject: Social Studies (AP State Syllabus)
-
-Learning Objectives
-By the end of this lesson, students will be able to:
+Objectives
 • [Objective 1]
 • [Objective 2]
 • [Objective 3]
-• [Objective 4]
 
-Minute-by-Minute Timeline
-Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
+Previous Knowledge
+• [1-2 points about what students should already know or a hook to activate prior knowledge]
+
+Teaching Plan
+Time | Topic / Core Concept | Teaching Strategy
 [Start] - [End] | [Topic] | [Strategy]
 [Start] - [End] | [Topic] | [Strategy]
+(Divide the ${durationMinutes} minutes logically using this exact pipe-separated format. Cover the introduction, core teaching, and wrap-up.)
 
-(Divide the lesson logically. Ensure the total duration adds up exactly to ${durationMinutes} minutes. Make activities suitable for Class 8 students.)
+Activity
+• [1-2 practical classroom activities suitable for this specific topic]
 
-Key Board Summary
-• [Important definition or concept]
-• [Important keyword]
-• [Important fact]
+Assessment
+• [2-3 quick questions or methods to assess student understanding during the class]
 
-Quick Assessment / Homework
-1. [Definition / Recall question]
-2. [Short-answer question]
-3. [Conceptual understanding question]
-4. [Application-based or Homework question]
+Differentiation
+• [1 brief strategy for advanced learners]
+• [1 brief strategy for students needing extra support]
+
+Homework
+• [1-2 relevant homework assignments based on the textbook content]
+
+Remedial
+• [1 brief strategy or core concept recap for students who didn't grasp the lesson]
+
+Reflection
+• [Space for teacher notes post-lesson, e.g., "Note what worked well and what needs adjusting..."]
+
+Next Lesson
+• [A brief 1-sentence bridge to what the class will cover next]
 
 FORMAT RULES:
-- Use clear headings exactly like the structure above.
+- Use clear headings EXACTLY as listed above. Do not add any extra sections.
 - Use bullet points where appropriate.
-- For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
+- For the Teaching Plan, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
 - Do NOT use HTML.
 - Do NOT use Markdown code blocks.
 - Do NOT use ASCII diagrams.
 - Do NOT use LaTeX.
-- Keep the lesson plan concise and practical.
-- Return ONLY the lesson plan text.
+- Keep the lesson plan concise, practical, and highly formatted for a UI dashboard.
+- Return ONLY the lesson plan text. No conversational introductions.
 `;
 
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
+        // ✅ Log AI Usage AFTER Gemini finishes
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard", 
@@ -129,7 +116,7 @@ FORMAT RULES:
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-            [teacherId, `AI Plan: ${displayTopic}`, chapterId, chapter_name, durationMinutes]
+            [teacherId, `AI Plan: ${chapter_name}`, chapterId, chapter_name, durationMinutes]
         );
 
         res.json({ lessonPlan: lessonPlanText });
