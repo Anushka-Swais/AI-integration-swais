@@ -27,7 +27,16 @@ const googleVoiceMap = {
 // 1. AUTO LESSON PLANNER
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
-    const { chapterId, durationMinutes = 45, userInfo } = req.body;
+    // Added specificTopic, customObjectives, and specialNotes from your UI
+    const { 
+        chapterId, 
+        durationMinutes = 45, 
+        userInfo, 
+        specificTopic, 
+        customObjectives, 
+        specialNotes 
+    } = req.body;
+    
     const teacherId = userInfo?.id || 3; 
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
@@ -38,6 +47,9 @@ export const generateLessonPlan = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
+        // Use the specific topic if provided, otherwise default to chapter name
+        const displayTopic = specificTopic ? specificTopic : chapter_name;
+
         const prompt = `
 You are an expert curriculum developer and senior school teacher.
 
@@ -46,22 +58,24 @@ Create a concise, classroom-ready lesson plan for:
 Class: 8th Standard
 Subject: Social Studies
 Board/Syllabus: AP State Syllabus
-Topic: "${chapter_name}"
+Topic: "${displayTopic}"
 Duration: ${durationMinutes} Minutes
 
 Use ONLY the following textbook content to create the lesson plan:
-
 "${full_text_content}"
 
-IMPORTANT:
-The lesson plan must follow EXACTLY the structure and style below.
+${customObjectives ? `IMPORTANT CUSTOM OBJECTIVES: Please ensure the following custom objectives are met in the plan: ${customObjectives}` : ""}
+${specialNotes ? `SPECIAL INSTRUCTIONS: Please incorporate these special notes into the activities/strategies: ${specialNotes}` : ""}
 
-Lesson Plan: [Topic Name]
+IMPORTANT:
+The lesson plan must follow EXACTLY the structure and style below. 
+
+Lesson Plan: ${displayTopic}
 
 Lesson Metadata
 Class: 8th Standard
-Topic: [Topic Name]
-Duration: ${durationMinutes} Minutes
+Topic: ${displayTopic}
+Duration: ${durationMinutes} Minutes 
 Subject: Social Studies (AP State Syllabus)
 
 Learning Objectives
@@ -72,66 +86,33 @@ By the end of this lesson, students will be able to:
 • [Objective 4]
 
 Minute-by-Minute Timeline
-
-Create a practical timeline covering the COMPLETE ${durationMinutes}-minute lesson.
-
-Use this format:
-
 Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
+[Start] - [End] | [Topic] | [Strategy]
+[Start] - [End] | [Topic] | [Strategy]
 
-Divide the lesson into logical teaching stages such as:
-- Introduction / Hook
-- Main Concepts
-- Explanation / Activity
-- Classroom Discussion
-- Application / Local Context
-- Conclusion & Assessment
-
-For each time interval:
-• Mention the exact time range.
-• Mention the topic/core concept being taught.
-• Give a practical teaching strategy or classroom activity.
-• Make activities suitable for Class 8 students.
-• Ensure the total duration adds up exactly to ${durationMinutes} minutes.
+(Divide the lesson logically. Ensure the total duration adds up exactly to ${durationMinutes} minutes. Make activities suitable for Class 8 students.)
 
 Key Board Summary
-
-Provide short points that the teacher can write on the classroom board.
-
-Include:
-• Important definitions
-• Important concepts
-• Important keywords
-• Important facts from the textbook
+• [Important definition or concept]
+• [Important keyword]
+• [Important fact]
 
 Quick Assessment / Homework
-
-Provide 3-5 questions.
-
-Include a mixture of:
-1. Definition / Recall question
-2. Short-answer question
-3. Conceptual understanding question
-4. Application-based question where supported by the textbook
-5. Homework question where appropriate
+1. [Definition / Recall question]
+2. [Short-answer question]
+3. [Conceptual understanding question]
+4. [Application-based or Homework question]
 
 FORMAT RULES:
 - Use clear headings exactly like the structure above.
 - Use bullet points where appropriate.
-- Do NOT use Markdown tables.
+- For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
 - Do NOT use HTML.
 - Do NOT use Markdown code blocks.
 - Do NOT use ASCII diagrams.
 - Do NOT use LaTeX.
-- Do NOT use $ or $$.
-- Do NOT add information that is not supported by the provided textbook content.
 - Keep the lesson plan concise and practical.
-- Use professional, teacher-friendly language.
-- Make the activities realistic for a school classroom.
-- Do not write long explanations.
-- Do not include an answer key.
-- Do not include sections that are not requested above.
-- Return ONLY the lesson plan.
+- Return ONLY the lesson plan text.
 `;
 
         const aiResult = await model.generateContent(prompt);
@@ -148,7 +129,7 @@ FORMAT RULES:
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-            [teacherId, `AI Plan: ${chapter_name}`, chapterId, chapter_name, durationMinutes]
+            [teacherId, `AI Plan: ${displayTopic}`, chapterId, chapter_name, durationMinutes]
         );
 
         res.json({ lessonPlan: lessonPlanText });
@@ -836,113 +817,5 @@ export const handleTextToSpeech = async (req, res) => {
     } catch (err) {
         console.error("🚨 GOOGLE TTS CRASH:", err);
         res.status(500).json({ error: "Voice generation failed", details: err.message });
-    }
-};
-
-// ==========================================
-// 13. WEEKLY TEST GENERATOR
-// ==========================================
-export const generateWeeklyTest = async (req, res) => {
-    // Extracting subject, chapterId, and optional totalMarks from the request
-    const { subject, chapterId, totalMarks = 20, userInfo } = req.body;
-    const teacherId = userInfo?.id || 3; 
-
-    if (!chapterId || !subject) {
-        return res.status(400).json({ error: "Both Subject and Chapter ID are required." });
-    }
-
-    try {
-        // Fetch the chapter content from the database
-        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Chapter not found in database." });
-        }
-        
-        const { chapter_name, full_text_content } = result.rows[0];
-
-        // Construct the strict AI prompt for the 4 question types
-        const prompt = `
-You are an expert examination paper setter for the subject: ${subject}.
-
-Generate a Weekly Test based ONLY on the Chapter Content provided below.
-
-🚨 CRITICAL INSTRUCTIONS:
-The test MUST contain a mix of EXACTLY these 4 types of questions:
-1. Multiple Choice Questions (MCQ)
-2. True/False
-3. Fill in the Blanks
-4. Short Answer
-
-The total marks for the test MUST be exactly ${totalMarks}. Distribute the marks as follows:
-- MCQs: 1 mark each
-- True/False: 1 mark each
-- Fill in the Blanks: 1 mark each
-- Short Answers: 2 marks each
-Adjust the count of each question type so the total sum is exactly ${totalMarks}.
-
-GLOBAL RULES:
-- NEVER use phrases like "According to the text" or "Based on the chapter".
-- For Fill in the Blanks, use "_____" to denote the blank space.
-- Leave the "options" array empty [] for True/False, Fill in the Blanks, and Short Answers.
-- Return ONLY valid JSON.
-- Do NOT return markdown.
-- Do NOT use backticks around the JSON.
-- Do NOT explain the JSON.
-
-Return exactly this JSON structure:
-{
-  "paperTitle": "Weekly Test: ${chapter_name}",
-  "subject": "${subject}",
-  "totalMarks": ${totalMarks},
-  "questions": [
-    {
-      "questionText": "...",
-      "type": "MCQ | True/False | Fill in the Blanks | Short Answer", 
-      "options": ["...", "...", "...", "..."], 
-      "answer": "...",
-      "marks": 1
-    }
-  ]
-}
-
-Chapter Content
-"${full_text_content}"
-`;
-
-        // Call Gemini model
-        const aiResult = await model.generateContent(prompt);
-
-        // ✅ Log AI Usage
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Generate Weekly Test (${subject})`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
-
-        // Clean and parse JSON response
-        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) {
-            throw new Error("AI did not return a valid JSON format.");
-        }
-
-        const generatedTest = JSON.parse(jsonMatch[0]);
-
-        // ✅ Save the generated Weekly Test to the Assessment table as a 'Draft'
-        await pool.query(
-            `INSERT INTO sgs_assessments (teacher_id, title, assessment_type, assessment_category, assessment_date, total_marks, publish_status, created_at)
-             VALUES ($1, $2, 'Weekly Test', 'Academic', CURRENT_DATE, $3, 'Draft', CURRENT_TIMESTAMP)`,
-            [teacherId, `Weekly Test: ${chapter_name}`, totalMarks]
-        );
-
-        // Send the parsed test paper back to the client
-        res.json(generatedTest);
-
-    } catch (err) {
-        console.error("🚨 WEEKLY TEST CRASH:", err);
-        res.status(500).json({ error: "Failed to generate weekly test.", details: err.message });
     }
 };

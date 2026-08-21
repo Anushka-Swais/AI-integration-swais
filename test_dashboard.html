@@ -3,379 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGS@school API Local Tester</title>
+    <title>Faculty Dashboard - Exam Generator</title>
     <style>
-        /* 🌍 FULL SCREEN CSS UPDATES */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; box-sizing: border-box; }
-        h1 { text-align: center; color: #2c3e50; margin-top: 0; }
-        
-        .container { display: flex; gap: 20px; width: 100%; max-width: 100%; margin: 0 auto; flex-wrap: wrap; box-sizing: border-box; }
-        
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; min-width: 400px; display: flex; flex-direction: column; }
-        h2 { border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; color: #2980b9; }
-        h3 { color: #2c3e50; margin-bottom: 10px; margin-top: 25px; }
-        
-        /* Global Form Styles */
-        label { display: block; margin-top: 15px; font-weight: bold; color: #2c3e50; }
-        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
-        
-        button { color: white; padding: 12px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        button:hover { transform: translateY(-1px); opacity: 0.9; }
-        .btn-primary { background-color: #3498db; }
-        .btn-success { background-color: #27ae60; }
-        .btn-danger { background-color: #e74c3c; }
-        .btn-purple { background-color: #8e44ad; }
-        .btn-orange { background-color: #e67e22; }
-        
-        .output { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 6px; margin-top: 20px; min-height: 150px; max-height: 75vh; overflow-y: auto; font-family: 'Segoe UI', sans-serif; white-space: pre-wrap; line-height: 1.6; flex-grow: 1; border: 2px solid #1abc9c; }
-        
-        .divider { margin: 20px 0; border: 0; border-top: 1px solid #eee; }
-        
-        /* 🔥 BULLETPROOF QUIZ RADIO BUTTON STYLES */
-        .question-block { background: #34495e; padding: 20px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .q-text { font-weight: bold; font-size: 1.15em; margin-bottom: 15px; color: #ecf0f1; }
-        
-        .q-option { margin-bottom: 10px; display: block; } 
-        .q-option label { display: inline-flex !important; align-items: flex-start !important; cursor: pointer; font-weight: normal; margin: 0 !important; color: #ecf0f1; gap: 10px !important; }
-        
-        .q-option input[type="radio"] { appearance: radio !important; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; flex: 0 0 16px !important; margin: 4px 0 0 0 !important; padding: 0 !important; cursor: pointer; }
-        .q-option span { display: inline-block; line-height: 1.4; }
-        
-        .q-answer { margin-top: 15px; color: #2ecc71; font-weight: bold; font-size: 1.1em; }
-        .q-solution { margin-top: 10px; color: #f1c40f; font-size: 0.95em; font-style: italic; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 6px; border-left: 3px solid #f1c40f; }
-
-        /* 🖨️ PRINT / PDF STYLES */
-        @media print {
-            body * { visibility: hidden; } /* Hide everything */
-            #competitiveOutput, #competitiveOutput * { visibility: visible; } /* Show only output */
-            #competitiveOutput { position: absolute; left: 0; top: 0; width: 100%; border: none; max-height: none; overflow: visible; background: white; color: black; padding: 0; }
-            
-            /* Make it look good on white paper */
-            .question-block { background: white; border: 1px solid #ccc; border-left: 5px solid #333; color: black; break-inside: avoid; page-break-inside: avoid; }
-            .q-text, .q-option label { color: black; }
-            .q-solution { background: #f9f9f9; color: #555; border-left: 3px solid #555; }
-            .q-answer { color: #27ae60; }
-            button { display: none !important; } /* Hide interactive buttons in print */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            min-height: 400px;
+        }
+        .loading {
+            display: none;
+            color: #e67e22;
+            font-weight: bold;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <h1>🚀 SGS@school Full-Screen API Tester</h1>
-
-    <div class="container">
-        <div class="card">
-            <h2>1. Competitive Exam Prep</h2>
-            
-            <label style="color: #e74c3c;">👑 Simulate Dashboard Role</label>
-            <select id="userRole" style="border: 2px solid #e74c3c; background-color: #fff5f5;">
-                <option value="teacher">👨‍🏫 Teacher (Preview Answers Mode)</option>
-                <option value="student">👨‍🎓 Student (Interactive Quiz Mode)</option>
+    <div class="panel">
+        <h2>Generate Exam / Notes</h2>
+        <form id="examForm">
+            <label for="examTarget">Exam Target:</label>
+            <select id="examTarget" required>
+                <option value="IIT JEE">IIT JEE</option>
+                <option value="NEET">NEET</option>
+                <option value="Olympiad">Olympiad</option>
+                <option value="UPSC">UPSC</option>
             </select>
 
-            <div style="display: flex; gap: 15px;">
-                <div style="flex: 1;">
-                    <label>Exam Target</label>
-                    <select id="examTarget" onchange="updateSubjects()">
-                        <option value="NEET">NEET</option>
-                        <option value="IIT JEE">IIT JEE</option>
-                        <option value="UPSC">UPSC</option>
-                        <option value="Olympiad">Olympiad</option>
-                        <option value="RRB">RRB</option>
-                    </select>
-                </div>
-                <div style="flex: 1;">
-                    <label>Class Level</label>
-                    <input type="number" id="classLevel" value="8">
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 15px;">
-                <div style="flex: 1;">
-                    <label>Subject</label>
-                    <select id="subject" onchange="updateTopics()"></select>
-                </div>
-                <div style="flex: 1;">
-                    <label>Topic</label>
-                    <select id="topic"></select>
-                </div>
-            </div>
-
-            <label>Content Type</label>
-            <select id="contentType">
-                <option value="Quiz">Quick Quiz (10 Qs)</option>
-                <option value="MockTest">Mock Test (15 Qs)</option>
-                <option value="PracticeQuestions">Practice Questions (5 Qs)</option>
-                <option value="PrepMaterial">Prep Material (Text Notes)</option>
+            <label for="classLevel">Class Level:</label>
+            <select id="classLevel" required>
+                <option value="6">Class 6</option>
+                <option value="7">Class 7</option>
+                <option value="8">Class 8</option>
+                <option value="9">Class 9</option>
+                <option value="10">Class 10</option>
             </select>
 
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn-primary" onclick="testCompetitiveAPI()" style="flex: 2;">⚡ Generate Content</button>
-                <button class="btn-success" onclick="downloadJSON()" style="flex: 1; display: none;" id="btnDownloadJson">📄 JSON</button>
-                <button class="btn-danger" onclick="downloadPDF()" style="flex: 1; display: none;" id="btnDownloadPdf">🖨️ PDF</button>
-            </div>
-            
-            <div id="competitiveOutput" class="output">Waiting for request...</div>
-        </div>
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" placeholder="e.g., Physics, Maths, Biology" required>
 
-        <div class="card">
-            <h2>2. Community Doubt Forum</h2>
-            
-            <h3 style="margin-top: 0;">A. Ask a Doubt</h3>
-            <input type="text" id="doubtSubject" placeholder="Subject (e.g. Math)" value="Math">
-            <textarea id="doubtText" rows="3" placeholder="Type your doubt here..."></textarea>
-            <button class="btn-orange" onclick="postDoubt()">Post Doubt</button>
-            
-            <hr class="divider">
+            <label for="topic">Topic:</label>
+            <input type="text" id="topic" placeholder="e.g., Kinematics: Velocity" required>
 
-            <h3>B. View Doubts Feed</h3>
-            <button class="btn-success" onclick="getDoubts()">Load Recent Doubts</button>
-            
-            <hr class="divider">
+            <label for="contentType">Content Type:</label>
+            <select id="contentType" required>
+                <option value="MockTest">Mock Test</option>
+                <option value="Quiz">Quiz</option>
+                <option value="PracticeQuestions">Practice Questions</option>
+                <option value="PrepMaterial">Preparation Material (Notes)</option>
+            </select>
 
-            <h3>C. Answer a Doubt</h3>
-            <input type="number" id="answerDoubtId" placeholder="Doubt ID (from feed)">
-            <textarea id="answerText" rows="3" placeholder="Write the detailed solution..."></textarea>
-            <button class="btn-purple" onclick="answerDoubt()">Submit Answer</button>
+            <label for="totalMarks">Total Marks (For Exams):</label>
+            <select id="totalMarks">
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="70">70</option>
+                <option value="100">100</option>
+            </select>
 
-            <div id="communityOutput" class="output" style="font-family: monospace;">Waiting for request...</div>
-        </div>
+            <label for="examDifficulty">Difficulty:</label>
+            <select id="examDifficulty">
+                <option value="Easy">Easy</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="Hard">Hard</option>
+            </select>
+
+            <button type="submit">Generate Content</button>
+            <div class="loading" id="loadingIndicator">Generating with AI... Please wait.</div>
+        </form>
+    </div>
+
+    <div class="panel">
+        <h2>Backend Response (JSON Preview)</h2>
+        <pre id="responseOutput">Fill out the form and hit "Generate Content" to see the API response here...</pre>
     </div>
 
     <script>
-        const API_BASE_URL = "http://localhost:5000/api/v1"; 
-        let currentQuizData = null; 
-        let currentRawText = null;
-
-        const examSubjectMap = {
-            "NEET": ["Physics", "Chemistry", "Biology"],
-            "IIT JEE": ["Physics", "Chemistry", "Mathematics"],
-            "UPSC": ["History", "Geography", "Polity", "General Science", "Logical Reasoning"],
-            "Olympiad": ["Mathematics", "Science", "Cyber", "English"],
-            "RRB": ["General Awareness", "Mathematics", "General Intelligence"]
-        };
-
-        const subjectTopicMap = {
-            "Physics": ["Kinematics", "Thermodynamics", "Electromagnetism", "Optics", "Work, Energy & Power"],
-            "Chemistry": ["Organic Chemistry", "Chemical Bonding", "States of Matter", "Atomic Structure"],
-            "Biology": ["Human Physiology", "Genetics", "Plant Kingdom", "Cell Biology"],
-            "Mathematics": ["Algebra", "Calculus", "Trigonometry", "Coordinate Geometry", "Probability"],
-            "History": ["Ancient India", "Medieval India", "Modern Indian History", "World History"],
-            "Geography": ["Physical Geography", "Indian Geography", "World Geography"],
-            "Polity": ["Constitution", "Parliament", "Judiciary", "Fundamental Rights"],
-            "General Science": ["Physics Basics", "Chemistry Basics", "Biology Basics"],
-            "Logical Reasoning": ["Puzzles", "Seating Arrangement", "Syllogism", "Blood Relations"],
-            "Science": ["Physics", "Chemistry", "Biology"],
-            "Cyber": ["Networking", "Hardware", "Logic Gates", "Internet Security"],
-            "English": ["Grammar", "Vocabulary", "Reading Comprehension"],
-            "General Awareness": ["Current Affairs", "Static GK", "Indian Economy"],
-            "General Intelligence": ["Analogies", "Coding-Decoding", "Number Series"]
-        };
-
-        function updateSubjects() {
-            const selectedExam = document.getElementById("examTarget").value;
-            const subjectDropdown = document.getElementById("subject");
-            subjectDropdown.innerHTML = ""; 
-            const subjects = examSubjectMap[selectedExam] || ["General Studies"];
-            subjects.forEach(sub => {
-                const opt = document.createElement("option");
-                opt.value = sub;
-                opt.innerHTML = sub;
-                subjectDropdown.appendChild(opt);
-            });
-            updateTopics(); 
-        }
-
-        function updateTopics() {
-            const selectedSubject = document.getElementById("subject").value;
-            const topicDropdown = document.getElementById("topic");
-            topicDropdown.innerHTML = ""; 
-            const topics = subjectTopicMap[selectedSubject] || ["General Concepts"];
-            topics.forEach(top => {
-                const opt = document.createElement("option");
-                opt.value = top;
-                opt.innerHTML = top;
-                topicDropdown.appendChild(opt);
-            });
-        }
-
-        window.onload = updateSubjects;
-
-        // --- 1. COMPETITIVE EXAM TESTER ---
-        async function testCompetitiveAPI() {
-            const outputBox = document.getElementById("competitiveOutput");
-            outputBox.innerHTML = "⏳ AI is generating content... Please wait.";
+        document.getElementById('examForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            // Hide buttons while generating
-            document.getElementById("btnDownloadJson").style.display = "none";
-            document.getElementById("btnDownloadPdf").style.display = "none";
-
-            const role = document.getElementById("userRole").value;
+            const outputArea = document.getElementById('responseOutput');
+            const loader = document.getElementById('loadingIndicator');
+            const submitBtn = document.querySelector('button[type="submit"]');
             
+            // Build the payload
             const payload = {
-                examTarget: document.getElementById("examTarget").value,
-                classLevel: document.getElementById("classLevel").value,
-                subject: document.getElementById("subject").value,
-                topic: document.getElementById("topic").value, 
-                contentType: document.getElementById("contentType").value,
-                userInfo: { id: 1, role: role, name: "Local Tester" }
+                examTarget: document.getElementById('examTarget').value,
+                classLevel: document.getElementById('classLevel').value,
+                subject: document.getElementById('subject').value,
+                topic: document.getElementById('topic').value,
+                contentType: document.getElementById('contentType').value,
+                totalMarks: document.getElementById('totalMarks').value,
+                examDifficulty: document.getElementById('examDifficulty').value,
+                userInfo: { userId: "faculty_123", role: "admin" }, // Mock user info
+                scheduledDate: new Date().toISOString() // Mock date
             };
 
+            // UI feedback
+            outputArea.textContent = "";
+            loader.style.display = 'block';
+            submitBtn.disabled = true;
+
             try {
-                const res = await fetch(`${API_BASE_URL}/competitive/generate`, {
+                // 🚨 IMPORTANT: Replace this URL with your actual local server URL 🚨
+                const API_URL = 'http://localhost:5000/api/competitive/generate';
+
+                const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
+
+                const data = await response.json();
                 
-                currentQuizData = data.questions ? data : null; 
-                currentRawText = data.prepMaterial ? data.prepMaterial : null;
-                
-                // Show Download Buttons
-                document.getElementById("btnDownloadJson").style.display = "flex";
-                document.getElementById("btnDownloadPdf").style.display = "flex";
-                
-                if (data.questions && Array.isArray(data.questions)) {
-                    const displayExam = data.exam || payload.examTarget;
-                    const displaySubject = data.subject || payload.subject;
-                    const displayTopic = data.topic || payload.topic;
-                    const displayClass = data.classLevel || payload.classLevel;
+                // Pretty print the JSON response
+                outputArea.textContent = JSON.stringify(data, null, 2);
 
-                    let html = `<h2 style="color: #1abc9c; margin-top: 0; border-bottom:none;">📝 ${displayExam} - ${displaySubject}</h2>`;
-                    html += `<p style="color: #bdc3c7; margin-bottom: 20px; font-size: 1.1em;">Topic: <b>${displayTopic}</b> | Class: ${displayClass} | View: <b style="color:#e74c3c;">${role.toUpperCase()}</b></p>`;
-                    
-                    if (role === 'teacher') {
-                        data.questions.forEach((q, i) => {
-                            html += `<div class="question-block">`;
-                            html += `<div class="q-text">Q${i+1}. ${q.questionText}</div>`;
-                            q.options.forEach(opt => {
-                                html += `<div class="q-option">○ ${opt}</div>`;
-                            });
-                            html += `<div class="q-answer">✓ Correct Answer: ${q.correctAnswer}</div>`;
-                            html += `<div class="q-solution">💡 Solution: ${q.detailedSolution}</div>`;
-                            html += `</div>`;
-                        });
-                    } else {
-                        html += `<form id="quizForm">`;
-                        data.questions.forEach((q, i) => {
-                            html += `<div class="question-block" id="qBlock_${i}">`;
-                            html += `<div class="q-text">Q${i+1}. ${q.questionText}</div>`;
-                            
-                            q.options.forEach((opt, j) => {
-                                html += `<div class="q-option">
-                                    <label>
-                                        <input type="radio" name="q_${i}" value="${opt.replace(/"/g, '&quot;')}"> 
-                                        <span>${opt}</span>
-                                    </label>
-                                </div>`;
-                            });
-
-                            html += `<div id="qResult_${i}" class="q-answer" style="display: none;"></div>`;
-                            html += `<div id="qLogic_${i}" class="q-solution" style="display: none;">💡 <b>Solution:</b> ${q.detailedSolution}</div>`;
-                            html += `</div>`;
-                        });
-                        
-                        html += `<button type="button" class="btn-success" onclick="gradeQuiz()" style="padding: 15px; font-size: 1.2em;">Submit Quiz</button>`;
-                        html += `<div id="quizScore" style="margin-top: 25px; font-size: 1.8em; font-weight: bold; color: #f1c40f; text-align:center;"></div>`;
-                        html += `</form>`;
-                    }
-
-                    outputBox.innerHTML = html;
-                } else if (data.prepMaterial) {
-                    outputBox.innerHTML = `<h2 style="color: #1abc9c; margin-top: 0; border-bottom:none;">📚 Study Material: ${payload.topic}</h2>\n\n` + data.prepMaterial;
-                } else {
-                    outputBox.innerHTML = JSON.stringify(data, null, 2);
-                }
-
-            } catch (err) {
-                outputBox.innerHTML = "🚨 Error connecting to server: " + err.message;
+            } catch (error) {
+                console.error("Error:", error);
+                outputArea.textContent = "Request Failed. Make sure your Node.js backend is running and the API_URL in this script is correct.\n\nError Details: " + error.message;
+            } finally {
+                loader.style.display = 'none';
+                submitBtn.disabled = false;
             }
-        }
-
-        // 🎓 GRADING FUNCTION
-        function gradeQuiz() {
-            if (!currentQuizData || !currentQuizData.questions) return;
-            let score = 0;
-            const total = currentQuizData.questions.length;
-
-            currentQuizData.questions.forEach((q, i) => {
-                const selectedOption = document.querySelector(`input[name="q_${i}"]:checked`);
-                const resultDiv = document.getElementById(`qResult_${i}`);
-                const logicDiv = document.getElementById(`qLogic_${i}`);
-                const block = document.getElementById(`qBlock_${i}`);
-
-                resultDiv.style.display = "block";
-                logicDiv.style.display = "block";
-
-                if (selectedOption && selectedOption.value === q.correctAnswer) {
-                    score++;
-                    resultDiv.innerHTML = `✅ Correct!`;
-                    resultDiv.style.color = "#2ecc71";
-                    block.style.borderLeftColor = "#2ecc71"; 
-                } else {
-                    resultDiv.innerHTML = `❌ Incorrect. Correct answer: <span style="color:#e74c3c; font-weight:normal;">${q.correctAnswer}</span>`;
-                    resultDiv.style.color = "#e74c3c";
-                    block.style.borderLeftColor = "#e74c3c"; 
-                }
-            });
-
-            const scoreDiv = document.getElementById("quizScore");
-            scoreDiv.innerHTML = `🎯 You scored ${score} out of ${total}!`;
-            scoreDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // 📥 DOWNLOAD JSON
-        function downloadJSON() {
-            const dataToDownload = currentQuizData || { prepMaterial: currentRawText };
-            if (!dataToDownload) return alert("Nothing to download yet!");
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToDownload, null, 2));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href",     dataStr     );
-            dlAnchorElem.setAttribute("download", "sgs_competitive_content.json");
-            dlAnchorElem.click();
-        }
-
-        // 🖨️ DOWNLOAD PDF (Using Print window to save as PDF)
-        function downloadPDF() {
-            if (!currentQuizData && !currentRawText) return alert("Nothing to print yet!");
-            window.print();
-        }
-
-        // --- 2. COMMUNITY FORUM TESTERS ---
-        async function postDoubt() {
-            const outputBox = document.getElementById("communityOutput");
-            const payload = {
-                studentId: 123, classLevel: document.getElementById("classLevel").value,
-                subject: document.getElementById("doubtSubject").value, doubtText: document.getElementById("doubtText").value,
-                userInfo: { id: 1, role: "student", name: "Local Tester" }
-            };
-            try {
-                const res = await fetch(`${API_BASE_URL}/community/doubt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
-            } catch (err) { outputBox.innerHTML = "🚨 Error: " + err.message; }
-        }
-
-        async function getDoubts() {
-            const outputBox = document.getElementById("communityOutput");
-            try {
-                const res = await fetch(`${API_BASE_URL}/community/doubts`);
-                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
-            } catch (err) { outputBox.innerHTML = "🚨 Error: " + err.message; }
-        }
-
-        async function answerDoubt() {
-            const outputBox = document.getElementById("communityOutput");
-            const payload = {
-                doubtId: document.getElementById("answerDoubtId").value, answeredById: 1, answeredByRole: "Teacher",
-                answerText: document.getElementById("answerText").value, userInfo: { id: 1, role: "teacher", name: "Local Tester" }
-            };
-            try {
-                const res = await fetch(`${API_BASE_URL}/community/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                outputBox.innerHTML = JSON.stringify(await res.json(), null, 2);
-            } catch (err) { outputBox.innerHTML = "🚨 Error: " + err.message; }
-        }
+        });
     </script>
 </body>
 </html>
