@@ -24,7 +24,7 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (CBSE STRICT UI FORMAT)
+// 1. AUTO LESSON PLANNER (CBSE AP UNIFIED FORMAT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -51,7 +51,7 @@ export const generateLessonPlan = async (req, res) => {
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert CBSE master teacher creating a highly detailed, practical guide for a faculty member.
+You are an expert CBSE master teacher creating a highly detailed, practical guide for a faculty member in Andhra Pradesh.
 
 Topic: "${finalTopic}"
 Class: ${classLevel}
@@ -64,44 +64,35 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTION:
-Do NOT write vague summaries like "Introduce the topic" or "Explain key concepts". You MUST write the EXACT teaching scripts, real-world examples, analogies, and specific HOTS (Higher Order Thinking Skills) questions the teacher should say out loud in class. 
-
-You MUST strictly follow the exact headings below so the system parses it correctly. Do NOT use markdown bolding (**) or asterisks.
+Do NOT write vague summaries. You MUST write exact teaching scripts, real-world examples, and specific methodologies. Do NOT use markdown bolding (**) or asterisks.
 
 REQUIRED EXACT STRUCTURE:
 
 Lesson Plan: ${finalTopic}
 
-Learning Objectives
-1. [Actionable specific objective 1]
-2. [Actionable specific objective 2]
-3. [Actionable specific objective 3]
+I. Pedagogical Intent & Target Outcomes
+• Learning Objectives: [Write 3 specific, measurable outcomes]
+• Chapter Gist: [Brief summary of core themes]
+• Keywords: [List 4-5 core vocabulary words]
 
-Materials Required
-[List 3-4 specific teaching aids separated by commas]
+II. Prerequisite Diagnostic & Hook Activity
+• The Hook: [Write the EXACT script/diagnostic question the teacher must ask to test prior knowledge]
 
-Lesson Flow
+III. Micro-Period Distribution Matrix
+Period / Time | Core Sub-Topic Target | Active Methodology & Strategies
+[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
+[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
+[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
 
-Introduction (10 min)
-Lesson Opening & Warm-up
-Teacher: [Write 3-4 sentences of the EXACT script to hook the students. E.g., "Good morning class! Have you ever wondered why...? Today we will explore..."]
-Students: [Detailed expected student response and participation]
+IV. Inclusive Infrastructure & Cross-Curricular Integration
+• Art Integration / Differentiation: [1 specific strategy to integrate art or support diverse learners]
 
-Core Teaching (25 min)
-Step-by-Step Instruction
-Teacher: [Write 6-8 sentences of detailed explanation. Include the exact concepts, examples, analogies, and specific questions the teacher must ask the students mid-lecture.]
-Students: [Detailed expected student activities, note-taking, or group discussion points]
+V. Assessment Framework
+• HOTS Prompt: [Write 1 challenging Higher Order Thinking Skills question to ask the class]
+• Home Assignment: [1 highly specific homework assignment related to the textbook]
 
-Assessment & Wrap-up (10 min)
-Interactive Q&A and Closure
-Teacher: [Exact recap script and 2 specific exit-ticket questions to ask the class]
-Students: [Expected answers from students]
-
-Assessment
-[1 specific short-answer or objective question to evaluate learning]
-
-Homework
-[1 highly specific homework assignment related to the textbook content]
+VI. Post-Lesson Reflective Log
+[To be filled out post-delivery - leave a blank placeholder line here]
 `;
 
         const aiResult = await model.generateContent(prompt);
@@ -128,7 +119,7 @@ Homework
 };
 
 // ==========================================
-// 2. AUTO QUESTION PAPER GENERATOR (SGS SCHOOL FORMAT)
+// 2. AUTO QUESTION PAPER GENERATOR (CBSE AP BLUEPRINT)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     const { 
@@ -137,7 +128,7 @@ export const generateQuestionPaper = async (req, res) => {
         questionType = 'All', 
         totalMarks = 50,
         classLevel = 'Class 8', 
-        subject = 'Select', // Dynamically passed from frontend
+        subject = 'Select',
         userInfo 
     } = req.body;
 
@@ -145,17 +136,15 @@ export const generateQuestionPaper = async (req, res) => {
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
-    // Validate marks strictly based on your UI tiers
-    const validMarks = [10, 20, 30, 50, 70, 100];
+    const validMarks = [10, 20, 30, 50, 70, 80, 100];
     if (!validMarks.includes(parseInt(totalMarks))) {
-        return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
+        return res.status(400).json({ error: "Total marks must be valid." });
     }
 
     const validDifficulties = ['Easy', 'Medium', 'Hard'];
     const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
 
     try {
-        // Fetch syllabus content from the database
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
@@ -167,12 +156,6 @@ export const generateQuestionPaper = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // Determine specific instructions based on faculty selection
-        let typesInstruction = "a balanced mixture of MCQ, Very Short Answer, Short Answer, Competency-Based, and Higher Order questions";
-        if (questionType !== "All") {
-            typesInstruction = `ONLY ${questionType} questions`;
-        }
-
         const prompt = `
 You are an expert school exam paper setter.
 Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
@@ -183,7 +166,6 @@ Class: ${classLevel}
 Subject: ${subject}
 Difficulty: ${validatedDifficulty}
 Total Marks: ${totalMarks}
-Question Types Required: ${typesInstruction}
 
 TEXTBOOK CONTENT TO USE:
 """
@@ -191,62 +173,54 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTIONS:
-1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
+1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}. Distribute the marks proportionally across Sections A to E based on standard CBSE blueprints.
 2. Base all questions strictly on the provided text. Do not invent facts.
 3. Complexity MUST match the ${validatedDifficulty} level.
-4. CHARACTER LIMITS: The answer provided in the key for "Short Q/A" MUST NOT exceed 180 characters. The answer for "Long Q/A" MUST NOT exceed 1800 characters. 
-5. FORMAT: Return a clean, human-readable Question Paper layout. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks to avoid UI rendering issues.
+4. FORMAT: Return a clean, human-readable Question Paper layout. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks.
 
 REQUIRED EXACT STRUCTURE:
 
 SGS
 PERIODIC / CLASS TEST – 2026-27
 Subject: ${subject}  |  Class: ${classLevel}
-Chapter: ${chapter_name}  |  Time: 45 Minutes  |  Maximum Marks: ${totalMarks}
+Chapter: ${chapter_name}  |  Time: Adjust based on marks  |  Maximum Marks: ${totalMarks}
 Name: ________________________ | Roll No.: ________________
 Section: __________ | Date: ________________
 
 General Instructions
 All questions are compulsory.
 The question paper consists of Sections A, B, C, D and E.
-Read each question carefully before answering.
 
-SECTION A – Objective Type Questions    [Generate Mark Breakdown e.g., 6 x 1 = 6 Marks]
-Q1. [Question]
-a) ...
-b) ...
-c) ...
-d) ...
-[Continue for Section A]
+SECTION A – Objective Type Questions (1 Mark Each)
+[Generate MCQs, fill-in items, and Assertion-Reasoning pairings]
 
-SECTION B – Very Short Answer Questions    [Generate Mark Breakdown]
-[Generate Questions]
+SECTION B – Very Short Answer Questions (2 Marks Each)
+[Generate direct questions. Answers should be 30 to 50 words]
 
-SECTION C – Short Answer / Application-Based Questions    [Generate Mark Breakdown]
-[Generate Questions]
+SECTION C – Short Answer Questions (3 Marks Each)
+[Generate brief explanations or mid-tier logic. Answers should be 50 to 80 words]
 
-SECTION D – Competency / Case-Based Question    [Generate Mark Breakdown]
-[Generate Questions]
+SECTION D – Long Answer Questions (5 Marks Each)
+[Generate detailed essay-style questions. Answers should be 80 to 120 words. Include strict internal choices like 'Answer this OR that']
 
-SECTION E – Higher Order / Application Question    [Generate Mark Breakdown]
-[Generate Questions]
+SECTION E – Case-Based / Source (4 Marks Each)
+[Generate integrated competency prompts evaluating a text block or case snippet based on the content]
 
 — END OF QUESTION PAPER —
 
 ===================================================================
 ANSWER KEY & MARKING SCHEME
 ===================================================================
-[Provide exact answers for all questions enforcing the character limits.]
+[Provide exact answers for all questions enforcing the word limits.]
 `;
 
         const aiResult = await model.generateContent(prompt);
         const paperText = aiResult.text;
         
-        // Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard - Auto Test", 
-            `Generate SGS Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
+            `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
