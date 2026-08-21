@@ -1,30 +1,30 @@
 import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
 import pool from "../config/db.js";
-import textToSpeech from '@google-cloud/text-to-speech'; // REQUIRED FOR GOOGLE TTS
+import textToSpeech from '@google-cloud/text-to-speech'; 
 
 // Google Cloud TTS Client Initialize using your API KEY from .env
 const ttsClient = new textToSpeech.TextToSpeechClient({
     apiKey: process.env.GOOGLE_TTS_API_KEY
 });
 
-// 🌍 UPDATED: Google Cloud Voice Mapping (Using Language Codes Only)
+// 🌍 Google Cloud Voice Mapping
 const googleVoiceMap = {
     "English": "en-IN",
     "Hindi": "hi-IN",
     "Telugu": "te-IN",
-    "Telegu": "te-IN", // Added alternate spelling to be safe
+    "Telegu": "te-IN", 
     "Kannada": "kn-IN",
     "Tamil": "ta-IN",
     "Malayalam": "ml-IN",
     "Bengali": "bn-IN",
     "Marathi": "mr-IN",
-    "Oriya": "hi-IN", // Oriya/Odia is often unsupported by TTS, safely falls back to Hindi
-    "Sanskrit": "hi-IN" // Sanskrit reads best using the Hindi TTS engine
+    "Oriya": "hi-IN", 
+    "Sanskrit": "hi-IN" 
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (STRICT TEACHER-FOCUSED FORMAT)
+// 1. AUTO LESSON PLANNER 
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -47,7 +47,6 @@ export const generateLessonPlan = async (req, res) => {
         const { chapter_name, full_text_content } = result.rows[0];
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
-        // ✨ REVERTED TO YOUR EXACT PREFERRED SAMPLE ✨
         const prompt = `
 You are an expert school teacher creating a practical guide for another faculty member.
 
@@ -83,8 +82,6 @@ Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
 [Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
 [Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
 
-(Divide the lesson logically. Ensure the total duration adds up exactly to ${durationMinutes} minutes. Make activities highly practical for the teacher to execute.)
-
 Key Board Summary
 • [Important definition or concept to write on the board]
 • [Important keyword]
@@ -100,20 +97,13 @@ FORMAT RULES:
 - Use plain bullet points (•) where appropriate.
 - For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
 - Do NOT use Markdown bolding (**text**) or asterisks (*) to prevent UI formatting glitches.
-- Keep the teaching strategies focused on helping the faculty member deliver the class effectively.
 - Return ONLY the lesson plan text.
 `;
 
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
-        // ✅ Log AI Usage
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            "Generate Lesson Plan", 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", "Generate Lesson Plan", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
@@ -230,12 +220,7 @@ ANSWER KEY & MARKING SCHEME
         const aiResult = await model.generateContent(prompt);
         const paperText = aiResult.text;
         
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard - Auto Test", 
-            `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard - Auto Test", `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ questionPaper: paperText });
 
@@ -245,7 +230,6 @@ ANSWER KEY & MARKING SCHEME
     }
 };
 
-/*
 // ==========================================
 // 3. AUTO ANSWER SHEET CORRECTOR 
 // ==========================================
@@ -254,20 +238,20 @@ export const autoCorrectAnswer = async (req, res) => {
     if (!question || !studentAnswer || !maxMarks || !rubric) return res.status(400).json({ error: "Missing required fields" });
 
     try {
-        const prompt = \`
+        const prompt = `
 You are an experienced school examiner.
 
 Question
-"\${question}"
+"${question}"
 
 Maximum Marks
-\${maxMarks}
+${maxMarks}
 
 Teacher Rubric
-"\${rubric}"
+"${rubric}"
 
 Student Answer
-"\${studentAnswer}"
+"${studentAnswer}"
 
 Evaluate fairly.
 Award partial marks where appropriate.
@@ -281,20 +265,14 @@ Return
    "awardedMarks":0,
    "feedback":"..."
 }
-\`;
+`;
 
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            "Auto Answer Sheet Corrector", 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", "Auto Answer Sheet Corrector", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
-        let cleanedText = aiResult.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-        const jsonMatch = cleanedText.match(/\\{[\\s\\S]*\\}/);
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         
         res.json(JSON.parse(jsonMatch[0]));
     } catch (err) {
@@ -302,7 +280,6 @@ Return
         res.status(500).json({ error: "Failed to correct answer.", details: err.message });
     }
 };
-*/    
 
 // ==========================================
 // 4. ASSIGNMENT DUE DATE ALERTS 
@@ -340,13 +317,7 @@ Do not use code blocks.
 
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            "Assignment Due Date Alerts", 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", "Assignment Due Date Alerts", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ reminderEmail: aiResult.text, list: missingAssignments });
     } catch (err) {
@@ -396,13 +367,7 @@ Plain text only.
         
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            "Assignment Completion Alerts", 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", "Assignment Completion Alerts", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ completionAlert: aiResult.text, data: completions });
     } catch (err) {
@@ -447,13 +412,7 @@ Formatting Rules
 
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Virtual Slate (${action})`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", `Virtual Slate (${action})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ processedContent: aiResult.text });
     } catch (err) {
@@ -515,13 +474,7 @@ No $ symbols.
 
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Student Analytics (${subject})`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", `Student Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ analysis: aiResult.text, chartData: studentData });
     } catch (err) {
@@ -582,13 +535,7 @@ No $.
     
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Class Analytics (${subject})`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", `Class Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ analyticsReport: aiResult.text, data: classData });
     } catch (err) {
@@ -622,13 +569,7 @@ Text
         
         const aiResult = await model.generateContent(prompt);
         
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            `Language Translator`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", `Language Translator`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ translation: aiResult.text.trim() });
     } catch (err) {
@@ -704,13 +645,7 @@ IMPORTANT RESPONSE RULES:
         const aiResult = await model.generateContent(prompt);
         const aiReply = aiResult.text;
 
-        // ✅ NEW: Log AI Usage AFTER Gemini finishes
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard", 
-            "Teacher AI Chatbot", 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
+        await logAIUsage(userInfo, "Teacher Dashboard", "Teacher AI Chatbot", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         await pool.query(
             `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
@@ -764,7 +699,6 @@ export const handleTextToSpeech = async (req, res) => {
 
         const [response] = await ttsClient.synthesizeSpeech(request);
         
-        // ✅ NEW: Log the TTS feature without tokens
         await logAIUsage(userInfo, "Teacher Dashboard", "Text-to-Speech (Listen)", null);
 
         res.json({
