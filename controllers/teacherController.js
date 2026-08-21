@@ -128,7 +128,7 @@ export const generateQuestionPaper = async (req, res) => {
         questionType = 'All', 
         totalMarks = 50,
         classLevel = 'Class 8', 
-        subject = 'Select', // Defaults to 'Select' if not provided by frontend
+        subject = 'Select', // Dynamically passed from frontend
         userInfo 
     } = req.body;
 
@@ -136,6 +136,7 @@ export const generateQuestionPaper = async (req, res) => {
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
+    // Validate marks strictly based on your UI tiers
     const validMarks = [10, 20, 30, 50, 70, 100];
     if (!validMarks.includes(parseInt(totalMarks))) {
         return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
@@ -145,14 +146,19 @@ export const generateQuestionPaper = async (req, res) => {
     const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
 
     try {
+        // Fetch syllabus content from the database
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
         );
-        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Chapter not found in database" });
+        }
         
         const { chapter_name, full_text_content } = result.rows[0];
 
+        // Determine specific instructions based on faculty selection
         let typesInstruction = "a balanced mixture of MCQ, Very Short Answer, Short Answer, Competency-Based, and Higher Order questions";
         if (questionType !== "All") {
             typesInstruction = `ONLY ${questionType} questions`;
@@ -227,6 +233,7 @@ ANSWER KEY & MARKING SCHEME
         const aiResult = await model.generateContent(prompt);
         const paperText = aiResult.text;
         
+        // Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard - Auto Test", 
