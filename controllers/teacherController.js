@@ -129,14 +129,16 @@ FORMAT RULES:
 };
 
 // ==========================================
-// 2. AUTO QUESTION PAPER GENERATOR (FORMATTED TEXT VERSION)
+// 2. AUTO QUESTION PAPER GENERATOR (AP CBSE BOARD FORMAT)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     const { 
         chapterId, 
         difficulty = 'Medium', 
         questionType = 'All', 
-        totalMarks = 50, 
+        totalMarks = 50,
+        classLevel = 'Class 8', 
+        subject = 'Social Studies', 
         userInfo 
     } = req.body;
 
@@ -144,13 +146,11 @@ export const generateQuestionPaper = async (req, res) => {
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
-    // Validate marks strictly based on your UI tiers
     const validMarks = [10, 20, 30, 50, 70, 100];
     if (!validMarks.includes(parseInt(totalMarks))) {
         return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
     }
 
-    // Validate difficulty against your required levels
     const validDifficulties = ['Easy', 'Medium', 'Hard'];
     const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
 
@@ -163,18 +163,19 @@ export const generateQuestionPaper = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // Determine specific instructions based on faculty selection
         let typesInstruction = "a balanced mixture of MCQ, True/False, Short Q/A, Long Q/A, and Matching words";
         if (questionType !== "All") {
             typesInstruction = `ONLY ${questionType} questions`;
         }
 
         const prompt = `
-You are an expert school exam paper setter.
+You are an expert school exam paper setter for the Andhra Pradesh State Board (CBSE Pattern).
 Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
 
 EXAM PARAMETERS:
 Chapter: "${chapter_name}"
+Class: ${classLevel}
+Subject: ${subject}
 Difficulty: ${validatedDifficulty}
 Total Marks: ${totalMarks}
 Question Types Required: ${typesInstruction}
@@ -189,14 +190,24 @@ CRITICAL INSTRUCTIONS:
 2. Base all questions strictly on the provided text. Do not invent facts.
 3. Complexity MUST match the ${validatedDifficulty} level.
 4. CHARACTER LIMITS: The answer provided in the key for "Short Q/A" MUST NOT exceed 180 characters. The answer for "Long Q/A" MUST NOT exceed 1800 characters. 
-5. FORMAT: Return a clean, human-readable Question Paper layout. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks. Use ALL CAPS for emphasis if needed.
+5. FORMAT: Return a clean, human-readable Question Paper layout mirroring official Andhra Pradesh CBSE board papers. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks.
 
 REQUIRED STRUCTURE:
 
 ===================================================================
-QUESTION PAPER: ${chapter_name}
+ANDHRA PRADESH STATE BOARD / CBSE PATTERN EXAM
 ===================================================================
-Total Marks: ${totalMarks} | Difficulty: ${validatedDifficulty}
+Class: ${classLevel} | Subject: ${subject}
+Chapter: ${chapter_name}
+Maximum Marks: ${totalMarks} | Difficulty: ${validatedDifficulty}
+Time Allowed: 2 Hours (Adjust appropriately)
+
+GENERAL INSTRUCTIONS:
+(i) The question paper comprises various sections. All questions are compulsory.
+(ii) Section A: Objective type questions (MCQ/True-False).
+(iii) Section B: Matching type questions.
+(iv) Section C: Short Answer type questions.
+(v) Section D: Long Answer type questions.
 
 SECTION A: OBJECTIVE QUESTIONS
 [Generate MCQs and True/False here. Format options as A), B), C), D)]
@@ -213,21 +224,19 @@ SECTION D: LONG ANSWER QUESTIONS
 ===================================================================
 ANSWER KEY & MARKING SCHEME
 ===================================================================
-[Provide exact answers for all questions. Strictly enforce the 180-character limit for Short Q/A and 1800-character limit for Long Q/A.]
+[Provide exact answers for all questions enforcing the 180/1800 character limits.]
 `;
 
         const aiResult = await model.generateContent(prompt);
         const paperText = aiResult.text;
         
-        // Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard - Auto Test", 
-            `Generate Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
+            `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        // ✅ CRITICAL: Safely return as JSON so the frontend fetch() doesn't crash!
         res.json({ questionPaper: paperText });
 
     } catch (err) {
@@ -236,6 +245,7 @@ ANSWER KEY & MARKING SCHEME
     }
 };
 
+/*
 // ==========================================
 // 3. AUTO ANSWER SHEET CORRECTOR 
 // ==========================================
@@ -244,20 +254,20 @@ export const autoCorrectAnswer = async (req, res) => {
     if (!question || !studentAnswer || !maxMarks || !rubric) return res.status(400).json({ error: "Missing required fields" });
 
     try {
-        const prompt = `
+        const prompt = \`
 You are an experienced school examiner.
 
 Question
-"${question}"
+"\${question}"
 
 Maximum Marks
-${maxMarks}
+\${maxMarks}
 
 Teacher Rubric
-"${rubric}"
+"\${rubric}"
 
 Student Answer
-"${studentAnswer}"
+"\${studentAnswer}"
 
 Evaluate fairly.
 Award partial marks where appropriate.
@@ -271,7 +281,7 @@ Return
    "awardedMarks":0,
    "feedback":"..."
 }
-`;
+\`;
 
         const aiResult = await model.generateContent(prompt);
         
@@ -283,8 +293,8 @@ Return
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        let cleanedText = aiResult.text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+        const jsonMatch = cleanedText.match(/\\{[\\s\\S]*\\}/);
         
         res.json(JSON.parse(jsonMatch[0]));
     } catch (err) {
@@ -292,6 +302,7 @@ Return
         res.status(500).json({ error: "Failed to correct answer.", details: err.message });
     }
 };
+*/    
 
 // ==========================================
 // 4. ASSIGNMENT DUE DATE ALERTS 
