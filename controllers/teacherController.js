@@ -24,7 +24,7 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER 
+// 1. AUTO LESSON PLANNER (DETAILED SCRIPT VERSION)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -41,23 +41,28 @@ export const generateLessonPlan = async (req, res) => {
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        const result = await pool.query(
+            'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
+            [chapterId]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const { chapter_name, full_text_content } = result.rows[0];
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert school teacher creating a practical guide for another faculty member.
+You are an expert school teacher creating a practical, highly detailed guide for another faculty member.
 
-Create a concise, classroom-ready lesson plan for:
+Create a classroom-ready lesson plan for:
 Topic: "${finalTopic}"
 Class: ${classLevel}
 Subject: ${subject}
 Duration: ${durationMinutes} Minutes
 
 Use ONLY the following textbook content to create the lesson plan:
-"${full_text_content}"
+"""
+${full_text_content}
+"""
 
 IMPORTANT:
 This lesson plan is strictly for the faculty to use in the classroom. It must follow EXACTLY the structure and style below. Do not add any extra sections.
@@ -77,10 +82,10 @@ By the end of this lesson, students will be able to:
 • [Objective 3]
 
 Minute-by-Minute Timeline
-Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
-[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
-[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
-[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+Time (Mins) | Topic / Core Concept | Detailed Teaching Strategy
+[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
+[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
+[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
 
 Key Board Summary
 • [Important definition or concept to write on the board]
@@ -103,7 +108,12 @@ FORMAT RULES:
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
-        await logAIUsage(userInfo, "Teacher Dashboard", "Generate Lesson Plan", aiResult.usageMetadata || aiResult.response?.usageMetadata);
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard", 
+            "Generate Lesson Plan", 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
 
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
