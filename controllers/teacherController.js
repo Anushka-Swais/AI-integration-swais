@@ -227,7 +227,7 @@ ANSWER KEY & MARKING SCHEME
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        // ✅ NEW: Simply return the beautifully formatted text instead of parsing JSON
+        // ✅ CRITICAL: Safely return as JSON so the frontend fetch() doesn't crash!
         res.json({ questionPaper: paperText });
 
     } catch (err) {
