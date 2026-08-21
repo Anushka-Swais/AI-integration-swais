@@ -24,7 +24,7 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (DETAILED SCRIPT VERSION)
+// 1. AUTO LESSON PLANNER (CBSE DETAILED FORMAT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -51,58 +51,49 @@ export const generateLessonPlan = async (req, res) => {
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert school teacher creating a practical, highly detailed guide for another faculty member.
+You are an expert CBSE master teacher. Your task is to write a highly detailed, classroom-ready lesson plan for a faculty member.
 
-Create a classroom-ready lesson plan for:
 Topic: "${finalTopic}"
 Class: ${classLevel}
 Subject: ${subject}
 Duration: ${durationMinutes} Minutes
 
-Use ONLY the following textbook content to create the lesson plan:
+Use ONLY the following textbook content to build the instructional delivery:
 """
 ${full_text_content}
 """
 
-IMPORTANT:
-This lesson plan is strictly for the faculty to use in the classroom. It must follow EXACTLY the structure and style below. Do not add any extra sections.
+CRITICAL INSTRUCTION: 
+Do NOT write vague summaries. You must write exact scripts, specific questions, and step-by-step actions for the teacher. The teacher should be able to read this and immediately teach the class. Do NOT use markdown bolding (**) or asterisks.
+
+REQUIRED EXACT STRUCTURE:
 
 Lesson Plan: ${finalTopic}
 
-Lesson Metadata
-Class: ${classLevel}
-Topic: ${finalTopic}
-Duration: ${durationMinutes} Minutes
-Subject: ${subject}
+Gist of the Lesson
+[Write a 2-3 sentence summary of the core theme and major concepts covered today.]
 
-Learning Objectives
-By the end of this lesson, students will be able to:
-• [Objective 1]
-• [Objective 2]
-• [Objective 3]
+Specific Learning Objectives (SLOs)
+By the end of this class, students will be able to:
+• [Actionable objective 1]
+• [Actionable objective 2]
+• [Actionable objective 3]
 
-Minute-by-Minute Timeline
-Time (Mins) | Topic / Core Concept | Detailed Teaching Strategy
-[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
-[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
-[Start] - [End] | [Topic] | [Provide the EXACT script, specific questions to ask the class, and step-by-step activity instructions the teacher should use. Do NOT write vague summaries like "explain the concept".]
+Prior Knowledge & Teaching Aids
+• Prerequisite Check: [Write 2 specific questions the teacher must ask to test what students already know]
+• Materials Required: [Digital tools, blackboard charts, props, or textbook pages]
 
-Key Board Summary
-• [Important definition or concept to write on the board]
-• [Important keyword]
-• [Important fact]
+Minute-by-Minute Lesson Flow
+Time (Mins) | Phase & Topic | Detailed Teacher Action & Script | Student Activity
+[Start-End] | Introduction (Hook) | [Exact script or activity to spark interest] | [What students do]
+[Start-End] | Presentation / Step-by-Step Delivery | [Detailed explanation script. Write out the exact examples and analogies the teacher should use.] | [What students do]
+[Start-End] | Classwork / Guided Practice | [Details of the exercise solved collaboratively on the board] | [What students do]
+[Start-End] | HOTS / Infusion Questions | [Write 1-2 challenging Higher Order Thinking Skills questions to ask the class] | [What students do]
+[Start-End] | Assessment & Evaluation | [Exit ticket, short oral quiz questions to measure learning] | [What students do]
 
-Quick Assessment / Homework
-1. [Definition / Recall question]
-2. [Short-answer question]
-3. [Application-based or Homework question]
-
-FORMAT RULES:
-- Use clear headings exactly like the structure above.
-- Use plain bullet points (•) where appropriate.
-- For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
-- Do NOT use Markdown bolding (**text**) or asterisks (*) to prevent UI formatting glitches.
-- Return ONLY the lesson plan text.
+Remedial Teaching & Homework
+• Remedial Support: [1 specific strategy to help slow learners grasp today's core concept]
+• Homework: [Follow-up tasks for home]
 `;
 
         const aiResult = await model.generateContent(prompt);
