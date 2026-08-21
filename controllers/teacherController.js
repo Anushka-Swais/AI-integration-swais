@@ -132,10 +132,9 @@ FORMAT RULES:
 // 2. AUTO QUESTION PAPER GENERATOR
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
-    // Extracting fields mapping to your frontend UI
     const { 
         chapterId, 
-        difficulty = 'Medium', 
+        difficulty = 'Medium', // Defaulting to Medium
         questionType = 'All', 
         totalMarks = 50, 
         userInfo 
@@ -145,37 +144,40 @@ export const generateQuestionPaper = async (req, res) => {
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
-    // Validate that marks strictly follow your requested tiers
+    // Validate marks strictly based on your UI tiers
     const validMarks = [10, 20, 30, 50, 70, 100];
     if (!validMarks.includes(parseInt(totalMarks))) {
         return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
     }
 
+    // ✅ NEW: Validate difficulty against your required levels
+    const validDifficulties = ['Easy', 'Medium', 'Hard'];
+    const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
+
     try {
-        // 1. Fetch the chapter content from your database
-        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        const result = await pool.query(
+            'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
+            [chapterId]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // 2. Determine exact question types based on frontend selection
-        let typesInstruction = "";
-        if (questionType === "All") {
-            typesInstruction = "MCQ, True/False, Short Q/A, Long Q/A, and Matching words";
-        } else {
-            typesInstruction = questionType; // e.g., "MCQ" or "Short Answer"
+        // Determine specific instructions based on faculty selection
+        let typesInstruction = "a balanced mixture of MCQ, True/False, Short Q/A, Long Q/A, and Matching words";
+        if (questionType !== "All") {
+            typesInstruction = `ONLY ${questionType} questions`;
         }
 
-        // 3. The AI Master Prompt for Question Papers
         const prompt = `
 You are an expert school exam paper setter.
-Create a highly accurate, challenging, and classroom-ready question paper based STRICTLY on the provided textbook content.
+Create a highly accurate, classroom-ready question paper based STRICTLY on the provided textbook content.
 
 EXAM PARAMETERS:
 Chapter: "${chapter_name}"
-Difficulty: ${difficulty}
+Difficulty: ${validatedDifficulty}
 Total Marks: ${totalMarks}
-Allowed Question Types: ${typesInstruction}
+Question Types Required: ${typesInstruction}
 
 TEXTBOOK CONTENT TO USE:
 """
@@ -183,54 +185,48 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTIONS:
-1. The sum of the "marks" for all questions MUST add up exactly to ${totalMarks}. Do not fall short.
-2. If the "Allowed Question Types" is "All", you MUST include a varied mixture of MCQ, True/False, Short Q/A, Long Q/A, and Matching words.
-3. If a specific type is requested (e.g., "MCQ"), generate ONLY that type of question.
-4. Base all questions strictly on the provided text. Do not hallucinate outside facts.
-5. Return ONLY valid JSON. Do NOT use markdown code blocks (\`\`\`json). Do NOT add any conversational text.
+1. The sum of the "marks" for all questions MUST add up exactly to ${totalMarks}.
+2. Base all questions strictly on the provided text. Do not invent facts.
+3. Difficulty Level Assigned by Faculty: ${validatedDifficulty}. Ensure the complexity of the questions strictly matches this difficulty.
+4. Return ONLY valid JSON. Do NOT use markdown code blocks (\`\`\`json). Do NOT add any conversational text.
 
 Return EXACTLY this JSON structure:
 {
   "paperTitle": "Chapter Assessment: ${chapter_name}",
   "chapter": "${chapter_name}",
-  "difficulty": "${difficulty}",
+  "difficulty": "${validatedDifficulty}",
   "totalMarks": ${totalMarks},
   "questions": [
     {
       "questionNumber": 1,
       "type": "MCQ", // Or True/False, Short Q/A, Long Q/A, Matching words
       "questionText": "...",
-      "marks": 2, // Assign realistic marks based on the difficulty/length
-      "options": ["A", "B", "C", "D"], // Include ONLY if type is MCQ
-      "matchingPairs": [{"left": "...", "right": "..."}], // Include ONLY if type is Matching words
+      "marks": 2, // Assign realistic marks based on length/difficulty
+      "options": ["A", "B", "C", "D"], // ONLY if type is MCQ
+      "matchingPairs": [{"left": "...", "right": "..."}], // ONLY if type is Matching words
       "correctAnswer": "Exact correct text or expected answer"
     }
   ]
 }
 `;
 
-        // 4. Generate with Gemini
         const aiResult = await model.generateContent(prompt);
         
-        // 5. Log AI Usage tracking
+        // Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard - Auto Test", 
-            `Generate Question Paper (${difficulty} - ${totalMarks} Marks)`, 
+            `Generate Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        // 6. Clean and parse the JSON safely
+        // Safely parse JSON output
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         
-        if (!jsonMatch) {
-            throw new Error("AI did not return a valid JSON format.");
-        }
+        if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
         
         const examData = JSON.parse(jsonMatch[0]);
-
-        // 7. Send the clean JSON back to the frontend
         res.json({ questionPaper: examData });
 
     } catch (err) {
