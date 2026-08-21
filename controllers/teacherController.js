@@ -24,7 +24,7 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (CBSE DETAILED FORMAT)
+// 1. AUTO LESSON PLANNER (CBSE STRICT UI FORMAT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -51,49 +51,57 @@ export const generateLessonPlan = async (req, res) => {
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert CBSE master teacher. Your task is to write a highly detailed, classroom-ready lesson plan for a faculty member.
+You are an expert CBSE master teacher creating a highly detailed, practical guide for a faculty member.
 
 Topic: "${finalTopic}"
 Class: ${classLevel}
 Subject: ${subject}
 Duration: ${durationMinutes} Minutes
 
-Use ONLY the following textbook content to build the instructional delivery:
+Use ONLY the following textbook content:
 """
 ${full_text_content}
 """
 
-CRITICAL INSTRUCTION: 
-Do NOT write vague summaries. You must write exact scripts, specific questions, and step-by-step actions for the teacher. The teacher should be able to read this and immediately teach the class. Do NOT use markdown bolding (**) or asterisks.
+CRITICAL INSTRUCTION:
+Do NOT write vague summaries like "Introduce the topic" or "Explain key concepts". You MUST write the EXACT teaching scripts, real-world examples, analogies, and specific HOTS (Higher Order Thinking Skills) questions the teacher should say out loud in class. 
+
+You MUST strictly follow the exact headings below so the system parses it correctly. Do NOT use markdown bolding (**) or asterisks.
 
 REQUIRED EXACT STRUCTURE:
 
 Lesson Plan: ${finalTopic}
 
-Gist of the Lesson
-[Write a 2-3 sentence summary of the core theme and major concepts covered today.]
+Learning Objectives
+1. [Actionable specific objective 1]
+2. [Actionable specific objective 2]
+3. [Actionable specific objective 3]
 
-Specific Learning Objectives (SLOs)
-By the end of this class, students will be able to:
-• [Actionable objective 1]
-• [Actionable objective 2]
-• [Actionable objective 3]
+Materials Required
+[List 3-4 specific teaching aids separated by commas]
 
-Prior Knowledge & Teaching Aids
-• Prerequisite Check: [Write 2 specific questions the teacher must ask to test what students already know]
-• Materials Required: [Digital tools, blackboard charts, props, or textbook pages]
+Lesson Flow
 
-Minute-by-Minute Lesson Flow
-Time (Mins) | Phase & Topic | Detailed Teacher Action & Script | Student Activity
-[Start-End] | Introduction (Hook) | [Exact script or activity to spark interest] | [What students do]
-[Start-End] | Presentation / Step-by-Step Delivery | [Detailed explanation script. Write out the exact examples and analogies the teacher should use.] | [What students do]
-[Start-End] | Classwork / Guided Practice | [Details of the exercise solved collaboratively on the board] | [What students do]
-[Start-End] | HOTS / Infusion Questions | [Write 1-2 challenging Higher Order Thinking Skills questions to ask the class] | [What students do]
-[Start-End] | Assessment & Evaluation | [Exit ticket, short oral quiz questions to measure learning] | [What students do]
+Introduction (10 min)
+Lesson Opening & Warm-up
+Teacher: [Write 3-4 sentences of the EXACT script to hook the students. E.g., "Good morning class! Have you ever wondered why...? Today we will explore..."]
+Students: [Detailed expected student response and participation]
 
-Remedial Teaching & Homework
-• Remedial Support: [1 specific strategy to help slow learners grasp today's core concept]
-• Homework: [Follow-up tasks for home]
+Core Teaching (25 min)
+Step-by-Step Instruction
+Teacher: [Write 6-8 sentences of detailed explanation. Include the exact concepts, examples, analogies, and specific questions the teacher must ask the students mid-lecture.]
+Students: [Detailed expected student activities, note-taking, or group discussion points]
+
+Assessment & Wrap-up (10 min)
+Interactive Q&A and Closure
+Teacher: [Exact recap script and 2 specific exit-ticket questions to ask the class]
+Students: [Expected answers from students]
+
+Assessment
+[1 specific short-answer or objective question to evaluate learning]
+
+Homework
+[1 highly specific homework assignment related to the textbook content]
 `;
 
         const aiResult = await model.generateContent(prompt);
