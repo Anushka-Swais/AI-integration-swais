@@ -24,18 +24,16 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (HIGH-DETAIL CLASSROOM-READY ENGINE)
+// 1. AUTO LESSON PLANNER (STRICT TEACHER-FOCUSED FORMAT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
         chapterId, 
         durationMinutes = 45, 
         userInfo,
-        classLevel = 'Class 8',
-        subject = 'Social Studies',
-        topic,
-        subtopic,
-        teacherInstructions = 'None'
+        classLevel = 'Not specified',
+        subject = 'Not specified',
+        topic
     } = req.body;
 
     const teacherId = userInfo?.id || 3; 
@@ -43,122 +41,73 @@ export const generateLessonPlan = async (req, res) => {
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        const result = await pool.query(
-            'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
-            [chapterId]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Chapter not found in database" });
-        }
+        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const { chapter_name, full_text_content } = result.rows[0];
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
+        // ✨ REVERTED TO YOUR EXACT PREFERRED SAMPLE ✨
         const prompt = `
-You are a Master Educator and Senior Curriculum Specialist.
-Create an exhaustive, highly detailed, step-by-step classroom lesson plan for:
+You are an expert school teacher creating a practical guide for another faculty member.
 
-Class/Grade: ${classLevel}
+Create a concise, classroom-ready lesson plan for:
+Topic: "${finalTopic}"
+Class: ${classLevel}
 Subject: ${subject}
-Chapter: ${chapter_name}
-Topic: ${finalTopic} ${subtopic ? `(Subtopic: ${subtopic})` : ''}
 Duration: ${durationMinutes} Minutes
-Special Teacher Directives: ${teacherInstructions}
 
-TEXTBOOK CONTENT TO USE (Strict Basis):
-"""
-${full_text_content}
-"""
+Use ONLY the following textbook content to create the lesson plan:
+"${full_text_content}"
 
-CRITICAL INSTRUCTIONS FOR MAXIMUM DETAIL & QUALITY:
-1. Avoid vague summaries (e.g., NEVER say "Explain key concepts to students"). Write the actual explanation, the exact questions the teacher should ask, and the expected answers from students.
-2. Ensure the time breakdown across all stages sums exactly to ${durationMinutes} minutes.
-3. Clean Formatting Rule: Do NOT use markdown bolding like '**word**' or '*' asterisks inside sentences. Use plain, clean headings and clear bullet points (•) so the text displays cleanly in modern UI cards.
+IMPORTANT:
+This lesson plan is strictly for the faculty to use in the classroom. It must follow EXACTLY the structure and style below. Do not add any extra sections.
 
-STRUCTURE TO GENERATE:
+Lesson Plan: ${finalTopic}
 
-===================================================================
-LESSON PLAN: ${finalTopic}
-===================================================================
+Lesson Metadata
+Class: ${classLevel}
+Topic: ${finalTopic}
+Duration: ${durationMinutes} Minutes
+Subject: ${subject}
 
-1. LESSON METADATA
-• Grade / Class: ${classLevel}
-• Subject: ${subject}
-• Topic: ${finalTopic}
-• Duration: ${durationMinutes} Minutes
-• Central Idea: (2-3 detailed sentences explaining the core takeaway)
-• Essential Question: (One deep inquiry question to spark curiosity)
+Learning Objectives
+By the end of this lesson, students will be able to:
+• [Objective 1]
+• [Objective 2]
+• [Objective 3]
 
-2. LEARNING OBJECTIVES (Bloom's Taxonomy Aligned)
-By the end of this ${durationMinutes}-minute lesson, students will be able to:
-• [Objective 1 - Recall/Knowledge]
-• [Objective 2 - Understanding/Explanation]
-• [Objective 3 - Application/Analysis]
-• [Objective 4 - Higher Order Thinking / Synthesis]
+Minute-by-Minute Timeline
+Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
 
-3. MATERIALS & CLASSROOM AIDS REQUIRED
-• Standard Aids: Textbook, Blackboard/Smartboard, Colored Chalk/Markers
-• Specialized Aids: (List relevant maps, diagrams, realia, or slide decks needed)
-• Non-Digital Backup: (Practical alternative if digital tools fail)
+(Divide the lesson logically. Ensure the total duration adds up exactly to ${durationMinutes} minutes. Make activities highly practical for the teacher to execute.)
 
-4. SET INDUCTION & PRIOR KNOWLEDGE ACTIVATION (Estimated: 5-8 Mins)
-• Hook Activity: (A compelling story, real-world scenario, or thought-provoking puzzle)
-• Diagnostic Questions to Ask Class:
-  1. Question: [Specific question] | Expected Answer: [Answer]
-  2. Question: [Specific question] | Expected Answer: [Answer]
-• Teacher Transition Statement: (Exact phrasing the teacher uses to introduce today's topic)
+Key Board Summary
+• [Important definition or concept to write on the board]
+• [Important keyword]
+• [Important fact]
 
-5. STEP-BY-STEP TEACHING & LEARNING FLOW (${durationMinutes} MINUTE TIMELINE)
-Divide the lesson into logical phases (e.g., Hook, Direct Instruction, Guided Activity, Formative Check, Closure).
+Quick Assessment / Homework
+1. [Definition / Recall question]
+2. [Short-answer question]
+3. [Application-based or Homework question]
 
-Format for each phase:
----
-Phase: [Phase Name] | Time: [X] Mins
-- Teacher Action & Script: (Give the detailed explanation and real-world examples to teach)
-- Student Action: (What students are actively writing, discussing, or solving)
-- Pedagogical Method: (Direct Instruction / Inquiry / Think-Pair-Share / Interactive Discussion)
-- In-Class Check for Understanding: (Quick question or observation check during this stage)
----
-
-6. KEY CONCEPTS, DEFINITIONS & BOARD SUMMARY
-Provide what the teacher should write on the blackboard for visual reinforcement:
-• Core Term 1: Definition and student-friendly explanation
-• Core Term 2: Definition and student-friendly explanation
-• Key Concept Summary / Flow Diagram (in structured text)
-• Common Misconception & Correction: (State common student error and the exact remedy)
-
-7. INTERACTIVE ACTIVITY / APPLICATION TASK
-• Activity Name:
-• Grouping: (Individual / Pairs / Groups of 4)
-• Task Description: (Concrete step-by-step activity instructions for students)
-• Expected Output: (What students produce by the end of the activity)
-
-8. DIFFERENTIATED INSTRUCTION STRATEGY
-• For Support / Remedial Learners: (Scaffolding strategy, simplified cue, or targeted prompt)
-• For Grade-Level Learners: (Core expected practice task)
-• For Advanced Learners: (High-Order Thinking extension challenge or open inquiry)
-
-9. FORMATIVE ASSESSMENT & QUICK CHECKS
-• Question 1 (Conceptual): [Question with model answer]
-• Question 2 (Analytical/Application): [Question with model answer]
-• Question 3 (Case/Scenario-Based): [Question with model answer]
-
-10. LESSON CLOSURE & EXIT TICKET (Estimated: 5 Mins)
-• 3 Key Takeaways to Summarize
-• Exit Ticket Prompt: (1 rapid written question for students to submit before leaving)
-• Bridge to Next Lesson: (What topic comes next and how this lesson connects to it)
-
-11. HOMEWORK & INDEPENDENT PRACTICE
-• Core Practice Task: (Review and textbook consolidation)
-• Application / Mini-Research Task: (Real-world or analytical assignment)
-• Estimated Completion Time: (e.g., 20 minutes)
+FORMAT RULES:
+- Use clear headings exactly like the structure above.
+- Use plain bullet points (•) where appropriate.
+- For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
+- Do NOT use Markdown bolding (**text**) or asterisks (*) to prevent UI formatting glitches.
+- Keep the teaching strategies focused on helping the faculty member deliver the class effectively.
+- Return ONLY the lesson plan text.
 `;
 
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
-        // Log AI Usage
+        // ✅ Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard", 
@@ -166,7 +115,6 @@ Provide what the teacher should write on the blackboard for visual reinforcement
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        // Save record to DB
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
@@ -177,6 +125,117 @@ Provide what the teacher should write on the blackboard for visual reinforcement
     } catch (err) {
         console.error("🚨 LESSON PLAN CRASH:", err);
         res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
+    }
+};
+
+// ==========================================
+// 2. AUTO QUESTION PAPER GENERATOR
+// ==========================================
+export const generateQuestionPaper = async (req, res) => {
+    // Extracting fields mapping to your frontend UI
+    const { 
+        chapterId, 
+        difficulty = 'Medium', 
+        questionType = 'All', 
+        totalMarks = 50, 
+        userInfo 
+    } = req.body;
+
+    const teacherId = userInfo?.id || 3; 
+
+    if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
+
+    // Validate that marks strictly follow your requested tiers
+    const validMarks = [10, 20, 30, 50, 70, 100];
+    if (!validMarks.includes(parseInt(totalMarks))) {
+        return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
+    }
+
+    try {
+        // 1. Fetch the chapter content from your database
+        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
+        
+        const { chapter_name, full_text_content } = result.rows[0];
+
+        // 2. Determine exact question types based on frontend selection
+        let typesInstruction = "";
+        if (questionType === "All") {
+            typesInstruction = "MCQ, True/False, Short Q/A, Long Q/A, and Matching words";
+        } else {
+            typesInstruction = questionType; // e.g., "MCQ" or "Short Answer"
+        }
+
+        // 3. The AI Master Prompt for Question Papers
+        const prompt = `
+You are an expert school exam paper setter.
+Create a highly accurate, challenging, and classroom-ready question paper based STRICTLY on the provided textbook content.
+
+EXAM PARAMETERS:
+Chapter: "${chapter_name}"
+Difficulty: ${difficulty}
+Total Marks: ${totalMarks}
+Allowed Question Types: ${typesInstruction}
+
+TEXTBOOK CONTENT TO USE:
+"""
+${full_text_content}
+"""
+
+CRITICAL INSTRUCTIONS:
+1. The sum of the "marks" for all questions MUST add up exactly to ${totalMarks}. Do not fall short.
+2. If the "Allowed Question Types" is "All", you MUST include a varied mixture of MCQ, True/False, Short Q/A, Long Q/A, and Matching words.
+3. If a specific type is requested (e.g., "MCQ"), generate ONLY that type of question.
+4. Base all questions strictly on the provided text. Do not hallucinate outside facts.
+5. Return ONLY valid JSON. Do NOT use markdown code blocks (\`\`\`json). Do NOT add any conversational text.
+
+Return EXACTLY this JSON structure:
+{
+  "paperTitle": "Chapter Assessment: ${chapter_name}",
+  "chapter": "${chapter_name}",
+  "difficulty": "${difficulty}",
+  "totalMarks": ${totalMarks},
+  "questions": [
+    {
+      "questionNumber": 1,
+      "type": "MCQ", // Or True/False, Short Q/A, Long Q/A, Matching words
+      "questionText": "...",
+      "marks": 2, // Assign realistic marks based on the difficulty/length
+      "options": ["A", "B", "C", "D"], // Include ONLY if type is MCQ
+      "matchingPairs": [{"left": "...", "right": "..."}], // Include ONLY if type is Matching words
+      "correctAnswer": "Exact correct text or expected answer"
+    }
+  ]
+}
+`;
+
+        // 4. Generate with Gemini
+        const aiResult = await model.generateContent(prompt);
+        
+        // 5. Log AI Usage tracking
+        await logAIUsage(
+            userInfo, 
+            "Teacher Dashboard - Auto Test", 
+            `Generate Question Paper (${difficulty} - ${totalMarks} Marks)`, 
+            aiResult.usageMetadata || aiResult.response?.usageMetadata
+        );
+
+        // 6. Clean and parse the JSON safely
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        
+        if (!jsonMatch) {
+            throw new Error("AI did not return a valid JSON format.");
+        }
+        
+        const examData = JSON.parse(jsonMatch[0]);
+
+        // 7. Send the clean JSON back to the frontend
+        res.json({ questionPaper: examData });
+
+    } catch (err) {
+        console.error("🚨 QUESTION PAPER CRASH:", err);
+        res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
     }
 };
 
