@@ -27,14 +27,13 @@ const googleVoiceMap = {
 // 1. AUTO LESSON PLANNER (COMPREHENSIVE SWAIS MASTER PROMPT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
-    // Extracting all recommended Swais input fields from the frontend
     const { 
         chapterId, 
         durationMinutes = 45, 
         userInfo,
         classLevel = 'Not specified',
         subject = 'Not specified',
-        topic,
+        topic, // <-- Now allowed to be empty
         subtopic = 'Not specified',
         numberOfPeriods = 'Not specified',
         teacherName = userInfo?.name || 'Not specified',
@@ -49,13 +48,16 @@ export const generateLessonPlan = async (req, res) => {
     const teacherId = userInfo?.id || 3; 
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
-    if (!topic) return res.status(400).json({ error: "Topic is required" });
+    // ❌ REMOVED: The strict !topic check that was causing the instant 400 error.
 
     try {
         const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         
         const { chapter_name, full_text_content } = result.rows[0];
+
+        // ✅ NEW: If the UI topic is blank, fallback to the chapter name!
+        const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         // ✨ THE NEW MASTER PROMPT ✨
         const prompt = `
@@ -68,7 +70,7 @@ Class/Grade: ${classLevel}
 Section: ${section}
 Subject: ${subject}
 Chapter/Unit: ${chapter_name}
-Topic: ${topic}
+Topic: ${finalTopic}
 Sub-topic: ${subtopic}
 Duration: ${durationMinutes} minutes
 Number of Periods: ${numberOfPeriods}
@@ -316,7 +318,7 @@ Return ONLY the completed lesson plan, not your internal reasoning.
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-            [teacherId, `AI Plan: ${topic}`, chapterId, chapter_name, durationMinutes]
+            [teacherId, `AI Plan: ${finalTopic}`, chapterId, chapter_name, durationMinutes]
         );
 
         res.json({ lessonPlan: lessonPlanText });
