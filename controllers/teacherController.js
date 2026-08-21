@@ -129,12 +129,12 @@ FORMAT RULES:
 };
 
 // ==========================================
-// 2. AUTO QUESTION PAPER GENERATOR
+// 2. AUTO QUESTION PAPER GENERATOR (FORMATTED TEXT VERSION)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     const { 
         chapterId, 
-        difficulty = 'Medium', // Defaulting to Medium
+        difficulty = 'Medium', 
         questionType = 'All', 
         totalMarks = 50, 
         userInfo 
@@ -150,7 +150,7 @@ export const generateQuestionPaper = async (req, res) => {
         return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
     }
 
-    // ✅ NEW: Validate difficulty against your required levels
+    // Validate difficulty against your required levels
     const validDifficulties = ['Easy', 'Medium', 'Hard'];
     const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
 
@@ -171,7 +171,7 @@ export const generateQuestionPaper = async (req, res) => {
 
         const prompt = `
 You are an expert school exam paper setter.
-Create a highly accurate, classroom-ready question paper based STRICTLY on the provided textbook content.
+Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
 
 EXAM PARAMETERS:
 Chapter: "${chapter_name}"
@@ -185,32 +185,39 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTIONS:
-1. The sum of the "marks" for all questions MUST add up exactly to ${totalMarks}.
+1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
 2. Base all questions strictly on the provided text. Do not invent facts.
-3. Difficulty Level Assigned by Faculty: ${validatedDifficulty}. Ensure the complexity of the questions strictly matches this difficulty.
-4. Return ONLY valid JSON. Do NOT use markdown code blocks (\`\`\`json). Do NOT add any conversational text.
+3. Complexity MUST match the ${validatedDifficulty} level.
+4. CHARACTER LIMITS: The answer provided in the key for "Short Q/A" MUST NOT exceed 180 characters. The answer for "Long Q/A" MUST NOT exceed 1800 characters. 
+5. FORMAT: Return a clean, human-readable Question Paper layout. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks. Use ALL CAPS for emphasis if needed.
 
-Return EXACTLY this JSON structure:
-{
-  "paperTitle": "Chapter Assessment: ${chapter_name}",
-  "chapter": "${chapter_name}",
-  "difficulty": "${validatedDifficulty}",
-  "totalMarks": ${totalMarks},
-  "questions": [
-    {
-      "questionNumber": 1,
-      "type": "MCQ", // Or True/False, Short Q/A, Long Q/A, Matching words
-      "questionText": "...",
-      "marks": 2, // Assign realistic marks based on length/difficulty
-      "options": ["A", "B", "C", "D"], // ONLY if type is MCQ
-      "matchingPairs": [{"left": "...", "right": "..."}], // ONLY if type is Matching words
-      "correctAnswer": "Exact correct text or expected answer"
-    }
-  ]
-}
+REQUIRED STRUCTURE:
+
+===================================================================
+QUESTION PAPER: ${chapter_name}
+===================================================================
+Total Marks: ${totalMarks} | Difficulty: ${validatedDifficulty}
+
+SECTION A: OBJECTIVE QUESTIONS
+[Generate MCQs and True/False here. Format options as A), B), C), D)]
+
+SECTION B: MATCHING WORDS
+[Generate Matching here if applicable]
+
+SECTION C: SHORT ANSWER QUESTIONS
+[Generate Short Q/A here if applicable]
+
+SECTION D: LONG ANSWER QUESTIONS
+[Generate Long Q/A here if applicable]
+
+===================================================================
+ANSWER KEY & MARKING SCHEME
+===================================================================
+[Provide exact answers for all questions. Strictly enforce the 180-character limit for Short Q/A and 1800-character limit for Long Q/A.]
 `;
 
         const aiResult = await model.generateContent(prompt);
+        const paperText = aiResult.text;
         
         // Log AI Usage
         await logAIUsage(
@@ -220,14 +227,8 @@ Return EXACTLY this JSON structure:
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        // Safely parse JSON output
-        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) throw new Error("AI did not return a valid JSON format.");
-        
-        const examData = JSON.parse(jsonMatch[0]);
-        res.json({ questionPaper: examData });
+        // ✅ NEW: Simply return the beautifully formatted text instead of parsing JSON
+        res.json({ questionPaper: paperText });
 
     } catch (err) {
         console.error("🚨 QUESTION PAPER CRASH:", err);
