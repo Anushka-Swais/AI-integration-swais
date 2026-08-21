@@ -24,6 +24,101 @@ const googleVoiceMap = {
 };
 
 // ==========================================
+// 1. AUTO LESSON PLANNER 
+// ==========================================
+export const generateLessonPlan = async (req, res) => {
+    const { 
+        chapterId, 
+        durationMinutes = 45, 
+        userInfo,
+        classLevel = 'Not specified',
+        subject = 'Not specified',
+        topic
+    } = req.body;
+
+    const teacherId = userInfo?.id || 3; 
+
+    if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
+
+    try {
+        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
+        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
+        
+        const { chapter_name, full_text_content } = result.rows[0];
+        const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
+
+        const prompt = `
+You are an expert school teacher creating a practical guide for another faculty member.
+
+Create a concise, classroom-ready lesson plan for:
+Topic: "${finalTopic}"
+Class: ${classLevel}
+Subject: ${subject}
+Duration: ${durationMinutes} Minutes
+
+Use ONLY the following textbook content to create the lesson plan:
+"${full_text_content}"
+
+IMPORTANT:
+This lesson plan is strictly for the faculty to use in the classroom. It must follow EXACTLY the structure and style below. Do not add any extra sections.
+
+Lesson Plan: ${finalTopic}
+
+Lesson Metadata
+Class: ${classLevel}
+Topic: ${finalTopic}
+Duration: ${durationMinutes} Minutes
+Subject: ${subject}
+
+Learning Objectives
+By the end of this lesson, students will be able to:
+• [Objective 1]
+• [Objective 2]
+• [Objective 3]
+
+Minute-by-Minute Timeline
+Time (Mins) | Topic / Core Concept | Teaching Strategy / Activity
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+[Start] - [End] | [Topic] | [Strategy helping the teacher explain the concept]
+
+Key Board Summary
+• [Important definition or concept to write on the board]
+• [Important keyword]
+• [Important fact]
+
+Quick Assessment / Homework
+1. [Definition / Recall question]
+2. [Short-answer question]
+3. [Application-based or Homework question]
+
+FORMAT RULES:
+- Use clear headings exactly like the structure above.
+- Use plain bullet points (•) where appropriate.
+- For the Minute-by-Minute Timeline, strictly use the pipe-separated text format shown above. Do NOT use standard Markdown tables (no |---|---| rows).
+- Do NOT use Markdown bolding (**text**) or asterisks (*) to prevent UI formatting glitches.
+- Return ONLY the lesson plan text.
+`;
+
+        const aiResult = await model.generateContent(prompt);
+        const lessonPlanText = aiResult.text;
+
+        await logAIUsage(userInfo, "Teacher Dashboard", "Generate Lesson Plan", aiResult.usageMetadata || aiResult.response?.usageMetadata);
+
+        await pool.query(
+            `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+            [teacherId, `AI Plan: ${finalTopic}`, chapterId, chapter_name, durationMinutes]
+        );
+
+        res.json({ lessonPlan: lessonPlanText });
+    } catch (err) {
+        console.error("🚨 LESSON PLAN CRASH:", err);
+        res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
+    }
+};
+
+// ==========================================
 // 2. AUTO QUESTION PAPER GENERATOR (SGS SCHOOL FORMAT)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
@@ -138,118 +233,6 @@ ANSWER KEY & MARKING SCHEME
             `Generate SGS Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
-
-        res.json({ questionPaper: paperText });
-
-    } catch (err) {
-        console.error("🚨 QUESTION PAPER CRASH:", err);
-        res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
-    }
-};
-
-// ==========================================
-// 2. AUTO QUESTION PAPER GENERATOR (AP CBSE BOARD FORMAT)
-// ==========================================
-export const generateQuestionPaper = async (req, res) => {
-    const { 
-        chapterId, 
-        difficulty = 'Medium', 
-        questionType = 'All', 
-        totalMarks = 50,
-        classLevel = 'Class 8', 
-        subject = 'Social Studies', 
-        userInfo 
-    } = req.body;
-
-    const teacherId = userInfo?.id || 3; 
-
-    if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
-
-    const validMarks = [10, 20, 30, 50, 70, 100];
-    if (!validMarks.includes(parseInt(totalMarks))) {
-        return res.status(400).json({ error: "Total marks must be exactly 10, 20, 30, 50, 70, or 100." });
-    }
-
-    const validDifficulties = ['Easy', 'Medium', 'Hard'];
-    const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
-
-    try {
-        const result = await pool.query(
-            'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
-            [chapterId]
-        );
-        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
-        
-        const { chapter_name, full_text_content } = result.rows[0];
-
-        let typesInstruction = "a balanced mixture of MCQ, True/False, Short Q/A, Long Q/A, and Matching words";
-        if (questionType !== "All") {
-            typesInstruction = `ONLY ${questionType} questions`;
-        }
-
-        const prompt = `
-You are an expert school exam paper setter for the Andhra Pradesh State Board (CBSE Pattern).
-Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
-
-EXAM PARAMETERS:
-Chapter: "${chapter_name}"
-Class: ${classLevel}
-Subject: ${subject}
-Difficulty: ${validatedDifficulty}
-Total Marks: ${totalMarks}
-Question Types Required: ${typesInstruction}
-
-TEXTBOOK CONTENT TO USE:
-"""
-${full_text_content}
-"""
-
-CRITICAL INSTRUCTIONS:
-1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
-2. Base all questions strictly on the provided text. Do not invent facts.
-3. Complexity MUST match the ${validatedDifficulty} level.
-4. CHARACTER LIMITS: The answer provided in the key for "Short Q/A" MUST NOT exceed 180 characters. The answer for "Long Q/A" MUST NOT exceed 1800 characters. 
-5. FORMAT: Return a clean, human-readable Question Paper layout mirroring official Andhra Pradesh CBSE board papers. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks.
-
-REQUIRED STRUCTURE:
-
-===================================================================
-ANDHRA PRADESH STATE BOARD / CBSE PATTERN EXAM
-===================================================================
-Class: ${classLevel} | Subject: ${subject}
-Chapter: ${chapter_name}
-Maximum Marks: ${totalMarks} | Difficulty: ${validatedDifficulty}
-Time Allowed: 2 Hours (Adjust appropriately)
-
-GENERAL INSTRUCTIONS:
-(i) The question paper comprises various sections. All questions are compulsory.
-(ii) Section A: Objective type questions (MCQ/True-False).
-(iii) Section B: Matching type questions.
-(iv) Section C: Short Answer type questions.
-(v) Section D: Long Answer type questions.
-
-SECTION A: OBJECTIVE QUESTIONS
-[Generate MCQs and True/False here. Format options as A), B), C), D)]
-
-SECTION B: MATCHING WORDS
-[Generate Matching here if applicable]
-
-SECTION C: SHORT ANSWER QUESTIONS
-[Generate Short Q/A here if applicable]
-
-SECTION D: LONG ANSWER QUESTIONS
-[Generate Long Q/A here if applicable]
-
-===================================================================
-ANSWER KEY & MARKING SCHEME
-===================================================================
-[Provide exact answers for all questions enforcing the 180/1800 character limits.]
-`;
-
-        const aiResult = await model.generateContent(prompt);
-        const paperText = aiResult.text;
-        
-        await logAIUsage(userInfo, "Teacher Dashboard - Auto Test", `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         res.json({ questionPaper: paperText });
 
