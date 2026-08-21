@@ -228,7 +228,7 @@ ANSWER KEY & MARKING SCHEME
         );
 
         // ✅ NEW: Simply return the beautifully formatted text instead of parsing JSON
-        res.json({ questionPaper: paperText });
+        res.send(paperText);
 
     } catch (err) {
         console.error("🚨 QUESTION PAPER CRASH:", err);
