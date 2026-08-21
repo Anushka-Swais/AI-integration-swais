@@ -3,180 +3,357 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faculty Dashboard - Exam Generator</title>
+    <title>SWAIS Sleek Lesson Planner Test</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
+            background-color: #1a1a2e; /* Matches your dark background */
             color: #333;
             margin: 0;
-            padding: 20px;
+            padding: 40px;
             display: flex;
-            gap: 20px;
+            gap: 30px;
+            justify-content: center;
         }
-        .panel {
-            background: #fff;
-            padding: 20px;
+
+        /* --- LEFT PANEL: THE FORM UI --- */
+        .planner-card {
+            background: #ffffff;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 550px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .alert-banner {
+            background-color: #f0f4ff;
+            border: 1px solid #d6e4ff;
+            color: #4a6ee0;
+            padding: 12px 16px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 24px;
+            cursor: pointer;
         }
-        h2 {
-            margin-top: 0;
-            color: #2c3e50;
+
+        .alert-banner span.view-result {
+            color: #6b8cff;
+            font-size: 13px;
         }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .header-title h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #111;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 24px;
+        }
+
         label {
             display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+            margin-top: 16px;
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #333;
+            box-sizing: border-box;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: #8b5cf6;
+        }
+
+        /* Duration Slider Styling */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 5px;
+        }
+        
+        .duration-label { margin-top: 0; }
+        
+        .duration-value {
+            background: #f0f4ff;
+            color: #4a6ee0;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: bold;
         }
-        input, select, button {
+
+        input[type="range"] {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
+            accent-color: #8b5cf6;
+            margin-top: 10px;
         }
-        button {
-            background-color: #3498db;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
+
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 5px;
+        }
+
+        .add-btn {
+            color: #6c5ce7;
+            font-size: 13px;
+            font-weight: 600;
+            background: none;
             border: none;
-            transition: background 0.3s;
+            cursor: pointer;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
-        button:hover {
-            background-color: #2980b9;
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6c5ce7 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 24px;
+            transition: opacity 0.2s;
         }
+
+        .submit-btn:hover { opacity: 0.9; }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* --- RIGHT PANEL: OUTPUT & DOWNLOAD --- */
+        .output-panel {
+            background: #2a2a40;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            padding: 24px;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-panel h3 { margin-top: 0; color: #fff; }
+
         pre {
-            background: #2d2d2d;
-            color: #f8f8f2;
+            background: #1e1e2f;
             padding: 15px;
-            border-radius: 4px;
+            border-radius: 8px;
+            color: #00d2d3;
             overflow-x: auto;
+            white-space: pre-wrap;
+            flex-grow: 1;
+            border: 1px solid #444;
+            font-size: 13px;
             min-height: 400px;
         }
-        .loading {
-            display: none;
-            color: #e67e22;
+
+        .download-btn {
+            background-color: #00b894;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
             font-weight: bold;
-            text-align: center;
+            cursor: pointer;
+            display: none;
+            margin-bottom: 15px;
+            align-self: flex-start;
         }
+
+        .download-btn:hover { background-color: #009688; }
     </style>
 </head>
 <body>
 
-    <div class="panel">
-        <h2>Generate Exam / Notes</h2>
-        <form id="examForm">
-            <label for="examTarget">Exam Target:</label>
-            <select id="examTarget" required>
-                <option value="IIT JEE">IIT JEE</option>
-                <option value="NEET">NEET</option>
-                <option value="Olympiad">Olympiad</option>
-                <option value="UPSC">UPSC</option>
+    <!-- LEFT PANEL: UI FORM -->
+    <div class="planner-card">
+        <div class="alert-banner">
+            <span>✨ Your last generated plan is ready</span>
+            <span class="view-result">View result ></span>
+        </div>
+
+        <div class="header-title">
+            <span style="background: #8b5cf6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px;">📝</span>
+            <h3>Plan Details</h3>
+        </div>
+        <div class="header-subtitle">Fill in the details below</div>
+
+        <form id="plannerForm">
+            <!-- 🚨 IMPORTANT: Value must match an actual ID in your local DB -->
+            <label>Chapter *</label>
+            <select id="chapterId" required>
+                <option value="1">Chapter 4 - The Colonial Era in India (ID: 1)</option>
+                <option value="2">Chapter 1 - Natural Resources (ID: 2)</option>
+                <!-- Add your actual local DB chapter IDs here to test -->
             </select>
 
-            <label for="classLevel">Class Level:</label>
-            <select id="classLevel" required>
-                <option value="6">Class 6</option>
-                <option value="7">Class 7</option>
-                <option value="8">Class 8</option>
-                <option value="9">Class 9</option>
-                <option value="10">Class 10</option>
-            </select>
+            <label>Specific Topic (optional)</label>
+            <input type="text" id="topic" placeholder="e.g. Preamble and Fundamental Rights">
 
-            <label for="subject">Subject:</label>
-            <input type="text" id="subject" placeholder="e.g., Physics, Maths, Biology" required>
+            <div style="margin-top: 20px;">
+                <div class="slider-container">
+                    <label class="duration-label">Duration</label>
+                    <span class="duration-value" id="durationDisplay">45 min</span>
+                </div>
+                <input type="range" id="duration" min="30" max="90" step="15" value="45">
+                <div class="slider-marks">
+                    <span>30 min</span>
+                    <span>60 min</span>
+                    <span>90 min</span>
+                </div>
+            </div>
 
-            <label for="topic">Topic:</label>
-            <input type="text" id="topic" placeholder="e.g., Kinematics: Velocity" required>
+            <label>Custom Objectives (or leave blank for AI defaults)</label>
+            <div id="objectivesContainer">
+                <input type="text" class="objective-input" placeholder="Objective 1">
+            </div>
+            <button type="button" class="add-btn" id="addObjectiveBtn">+ Add objective</button>
 
-            <label for="contentType">Content Type:</label>
-            <select id="contentType" required>
-                <option value="MockTest">Mock Test</option>
-                <option value="Quiz">Quiz</option>
-                <option value="PracticeQuestions">Practice Questions</option>
-                <option value="PrepMaterial">Preparation Material (Notes)</option>
-            </select>
+            <label>Special Notes (optional)</label>
+            <textarea id="specialNotes" rows="3" placeholder="e.g. Include a debate activity, focus on rural students' context..."></textarea>
 
-            <label for="totalMarks">Total Marks (For Exams):</label>
-            <select id="totalMarks">
-                <option value="20">20</option>
-                <option value="30">30</option>
-                <option value="50">50</option>
-                <option value="70">70</option>
-                <option value="100">100</option>
-            </select>
-
-            <label for="examDifficulty">Difficulty:</label>
-            <select id="examDifficulty">
-                <option value="Easy">Easy</option>
-                <option value="Medium" selected>Medium</option>
-                <option value="Hard">Hard</option>
-            </select>
-
-            <button type="submit">Generate Content</button>
-            <div class="loading" id="loadingIndicator">Generating with AI... Please wait.</div>
+            <button type="submit" class="submit-btn" id="generateBtn">✨ Generate with AI ✨</button>
         </form>
     </div>
 
-    <div class="panel">
-        <h2>Backend Response (JSON Preview)</h2>
-        <pre id="responseOutput">Fill out the form and hit "Generate Content" to see the API response here...</pre>
+    <!-- RIGHT PANEL: PREVIEW & DOWNLOAD -->
+    <div class="output-panel">
+        <h3>Backend Response Preview</h3>
+        <button id="downloadBtn" class="download-btn">📥 Download Lesson Plan (.md)</button>
+        <pre id="responseOutput">Configure the sleek UI on the left and hit "Generate with AI" to test your backend...</pre>
     </div>
 
     <script>
-        document.getElementById('examForm').addEventListener('submit', async function(e) {
+        let generatedText = ""; 
+
+        // Update Slider Text dynamically
+        const durationSlider = document.getElementById('duration');
+        const durationDisplay = document.getElementById('durationDisplay');
+        durationSlider.addEventListener('input', (e) => {
+            durationDisplay.textContent = `${e.target.value} min`;
+        });
+
+        // Add extra objective fields dynamically
+        document.getElementById('addObjectiveBtn').addEventListener('click', () => {
+            const container = document.getElementById('objectivesContainer');
+            const inputCount = container.querySelectorAll('input').length + 1;
+            const newInput = document.createElement('input');
+            newInput.type = 'text';
+            newInput.className = 'objective-input';
+            newInput.placeholder = `Objective ${inputCount}`;
+            newInput.style.marginTop = '10px';
+            container.appendChild(newInput);
+        });
+
+        // Form Submit Handler
+        document.getElementById('plannerForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const outputArea = document.getElementById('responseOutput');
-            const loader = document.getElementById('loadingIndicator');
-            const submitBtn = document.querySelector('button[type="submit"]');
+            const generateBtn = document.getElementById('generateBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
             
-            // Build the payload
+            // Gather all custom objectives into a single string
+            const objectives = Array.from(document.querySelectorAll('.objective-input'))
+                                   .map(input => input.value)
+                                   .filter(val => val.trim() !== '')
+                                   .join('; ');
+
+            // Build Payload
             const payload = {
-                examTarget: document.getElementById('examTarget').value,
-                classLevel: document.getElementById('classLevel').value,
-                subject: document.getElementById('subject').value,
+                chapterId: document.getElementById('chapterId').value,
                 topic: document.getElementById('topic').value,
-                contentType: document.getElementById('contentType').value,
-                totalMarks: document.getElementById('totalMarks').value,
-                examDifficulty: document.getElementById('examDifficulty').value,
-                userInfo: { userId: "faculty_123", role: "admin" }, // Mock user info
-                scheduledDate: new Date().toISOString() // Mock date
+                durationMinutes: document.getElementById('duration').value,
+                // Passing your UI notes to the backend variables
+                customObjectives: objectives, 
+                teacherInstructions: document.getElementById('specialNotes').value,
+                userInfo: { id: 3, name: "SWAIS Faculty" }
             };
 
             // UI feedback
-            outputArea.textContent = "";
-            loader.style.display = 'block';
-            submitBtn.disabled = true;
+            outputArea.textContent = "Connecting to AI... Please wait.";
+            generateBtn.disabled = true;
+            generateBtn.textContent = "Generating...";
+            downloadBtn.style.display = 'none';
 
             try {
-                // 🚨 IMPORTANT: Replace this URL with your actual local server URL 🚨
-                const API_URL = 'http://localhost:5000/api/competitive/generate';
+                // 🚨 Pointing to port 5000 based on your .env settings 🚨
+                const API_URL = 'http://localhost:5000/api/lesson-plan'; 
 
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
                 
-                // Pretty print the JSON response
-                outputArea.textContent = JSON.stringify(data, null, 2);
+                if (!response.ok) throw new Error(data.error || "Unknown error occurred.");
+
+                // Display response
+                generatedText = data.lessonPlan;
+                outputArea.textContent = generatedText;
+                downloadBtn.style.display = 'block';
 
             } catch (error) {
                 console.error("Error:", error);
-                outputArea.textContent = "Request Failed. Make sure your Node.js backend is running and the API_URL in this script is correct.\n\nError Details: " + error.message;
+                outputArea.textContent = "❌ Request Failed.\n\nError Details: " + error.message;
             } finally {
-                loader.style.display = 'none';
-                submitBtn.disabled = false;
+                generateBtn.disabled = false;
+                generateBtn.textContent = "✨ Generate with AI ✨";
             }
+        });
+
+        // Download Logic
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if (!generatedText) return;
+            const blob = new Blob([generatedText], { type: 'text/markdown' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Generate a smart filename
+            const topicName = document.getElementById('topic').value || 'Lesson_Plan';
+            a.download = `${topicName.replace(/\s+/g, '_')}.md`; 
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         });
     </script>
 </body>

@@ -24,290 +24,141 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (COMPREHENSIVE SWAIS MASTER PROMPT)
+// 1. AUTO LESSON PLANNER (HIGH-DETAIL CLASSROOM-READY ENGINE)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
         chapterId, 
         durationMinutes = 45, 
         userInfo,
-        classLevel = 'Not specified',
-        subject = 'Not specified',
-        topic, // <-- Now allowed to be empty
-        subtopic = 'Not specified',
-        numberOfPeriods = 'Not specified',
-        teacherName = userInfo?.name || 'Not specified',
-        section = 'Not specified',
-        date = new Date().toISOString().split('T')[0],
-        academicYear = 'Not specified',
-        board = 'CBSE',
-        teachingMode = 'Classroom',
+        classLevel = 'Class 8',
+        subject = 'Social Studies',
+        topic,
+        subtopic,
         teacherInstructions = 'None'
     } = req.body;
 
     const teacherId = userInfo?.id || 3; 
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
-    // ❌ REMOVED: The strict !topic check that was causing the instant 400 error.
 
     try {
-        const result = await pool.query('SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', [chapterId]);
-        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
+        const result = await pool.query(
+            'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
+            [chapterId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Chapter not found in database" });
+        }
         
         const { chapter_name, full_text_content } = result.rows[0];
-
-        // ✅ NEW: If the UI topic is blank, fallback to the chapter name!
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
-        // ✨ THE NEW MASTER PROMPT ✨
         const prompt = `
-SYSTEM / MASTER PROMPT — SWAIS AI LESSON PLANNER
+You are a Master Educator and Senior Curriculum Specialist.
+Create an exhaustive, highly detailed, step-by-step classroom lesson plan for:
 
-You are an expert school lesson-planning assistant for CBSE schools. Generate a teacher-ready lesson plan for Classes 1–12 across academic subjects.
-
-INPUTS
 Class/Grade: ${classLevel}
-Section: ${section}
 Subject: ${subject}
-Chapter/Unit: ${chapter_name}
-Topic: ${finalTopic}
-Sub-topic: ${subtopic}
-Duration: ${durationMinutes} minutes
-Number of Periods: ${numberOfPeriods}
-Teacher: ${teacherName}
-Date: ${date}
-Academic Year: ${academicYear}
-Board: ${board}
-Teaching Mode: ${teachingMode}
-Additional Teacher Instructions: ${teacherInstructions}
+Chapter: ${chapter_name}
+Topic: ${finalTopic} ${subtopic ? `(Subtopic: ${subtopic})` : ''}
+Duration: ${durationMinutes} Minutes
+Special Teacher Directives: ${teacherInstructions}
 
-TEXTBOOK / CURRICULUM CONTENT:
-Base the lesson heavily on the following source material:
-"${full_text_content}"
+TEXTBOOK CONTENT TO USE (Strict Basis):
+"""
+${full_text_content}
+"""
 
-PRIMARY OBJECTIVE
-Create a practical lesson plan that a teacher can follow directly in the classroom. The plan must be age-appropriate, subject-appropriate, competency-oriented, realistic for the stated duration, and aligned to the supplied curriculum/textbook information.
+CRITICAL INSTRUCTIONS FOR MAXIMUM DETAIL & QUALITY:
+1. Avoid vague summaries (e.g., NEVER say "Explain key concepts to students"). Write the actual explanation, the exact questions the teacher should ask, and the expected answers from students.
+2. Ensure the time breakdown across all stages sums exactly to ${durationMinutes} minutes.
+3. Clean Formatting Rule: Do NOT use markdown bolding like '**word**' or '*' asterisks inside sentences. Use plain, clean headings and clear bullet points (•) so the text displays cleanly in modern UI cards.
 
-IMPORTANT RULES
-1. Never invent a chapter name, NCERT page number, curriculum code, official CBSE competency code, or textbook reference if it was not supplied or reliably available. If unavailable, write "Not specified".
-2. Do not assume that every lesson needs every possible pedagogy. Select only what fits the topic.
-3. Adapt language and difficulty to the class.
-4. Keep activities feasible in a normal classroom and within the stated duration.
-5. Do not overload a 40–60 minute lesson with too many concepts.
-6. Distinguish teacher actions from student actions.
-7. Include checks for understanding during teaching, not only at the end.
-8. Include common misconceptions only when they are plausible for the topic.
-9. Do not fabricate student-specific information.
-10. For laboratory/practical work, include relevant safety precautions.
-11. For mathematics/science, render equations and formulae clearly without unnecessary LaTeX delimiters or dollar signs.
-12. For younger classes, use simple vocabulary, concrete examples, visuals, games, stories, and short activities.
-13. For senior classes, increase conceptual depth, application, analysis, problem solving, practical work, and exam-oriented practice as appropriate.
-14. Use competency-based and application-based questions where suitable.
-15. Avoid repeating the same question in different sections.
-16. Homework must be realistic and connected to the lesson.
-17. If technology is suggested, provide a non-digital backup.
-18. If a section is genuinely irrelevant, omit it rather than filling it with generic content.
-19. Keep the plan teacher-friendly: concise instructions, clear timings, actionable steps.
-20. Do not claim official CBSE compliance unless the supplied information supports that claim.
+STRUCTURE TO GENERATE:
 
-ADAPTATION
-Classes 1–2: simple language, storytelling, visuals, games, movement, repetition, oral checks.
-Classes 3–5: guided activities, examples, worksheets, discussion, basic application.
-Classes 6–8: conceptual learning, inquiry, collaboration, application, misconceptions, competency tasks.
-Classes 9–10: analytical reasoning, competency-based/case-based questions, structured practice, examination readiness.
-Classes 11–12: subject depth, advanced application, derivations/numericals where relevant, practical work, analysis, examination preparation.
+===================================================================
+LESSON PLAN: ${finalTopic}
+===================================================================
 
-SUBJECT ADAPTATION
-Languages/English: reading, comprehension, vocabulary, grammar, speaking, writing, literature interpretation.
-Mathematics: concept, worked examples, reasoning, practice, error analysis, application, problem solving.
-Science: inquiry, observation, demonstration/experiment, evidence, misconceptions, diagrams, real-life application, safety.
-Social Science: chronology, cause-effect, maps, sources, comparison, civic/economic reasoning, case studies.
-Computer Science/AI: demonstration, algorithms, coding/practical tasks, debugging, data interpretation, hands-on practice.
-Commerce/Economics/Business/Accountancy: principles, terminology, numerical/application problems, cases, interpretation, exam-style practice.
-Arts/PE/skill subjects: demonstration, practice, performance, technique, observation, reflection, practical assessment.
+1. LESSON METADATA
+• Grade / Class: ${classLevel}
+• Subject: ${subject}
+• Topic: ${finalTopic}
+• Duration: ${durationMinutes} Minutes
+• Central Idea: (2-3 detailed sentences explaining the core takeaway)
+• Essential Question: (One deep inquiry question to spark curiosity)
 
-OUTPUT FORMAT
+2. LEARNING OBJECTIVES (Bloom's Taxonomy Aligned)
+By the end of this ${durationMinutes}-minute lesson, students will be able to:
+• [Objective 1 - Recall/Knowledge]
+• [Objective 2 - Understanding/Explanation]
+• [Objective 3 - Application/Analysis]
+• [Objective 4 - Higher Order Thinking / Synthesis]
 
-# LESSON PLAN
+3. MATERIALS & CLASSROOM AIDS REQUIRED
+• Standard Aids: Textbook, Blackboard/Smartboard, Colored Chalk/Markers
+• Specialized Aids: (List relevant maps, diagrams, realia, or slide decks needed)
+• Non-Digital Backup: (Practical alternative if digital tools fail)
 
-## 1. Lesson Information
-Provide all known input fields.
+4. SET INDUCTION & PRIOR KNOWLEDGE ACTIVATION (Estimated: 5-8 Mins)
+• Hook Activity: (A compelling story, real-world scenario, or thought-provoking puzzle)
+• Diagnostic Questions to Ask Class:
+  1. Question: [Specific question] | Expected Answer: [Answer]
+  2. Question: [Specific question] | Expected Answer: [Answer]
+• Teacher Transition Statement: (Exact phrasing the teacher uses to introduce today's topic)
 
-## 2. Lesson Overview
-- Topic
-- Brief description
-- Central idea
-- Essential question
-- Real-life connection
+5. STEP-BY-STEP TEACHING & LEARNING FLOW (${durationMinutes} MINUTE TIMELINE)
+Divide the lesson into logical phases (e.g., Hook, Direct Instruction, Guided Activity, Formative Check, Closure).
 
-## 3. Curriculum & Competency Alignment
-Use only supplied/known references. Include relevant competencies and subject skills.
+Format for each phase:
+---
+Phase: [Phase Name] | Time: [X] Mins
+- Teacher Action & Script: (Give the detailed explanation and real-world examples to teach)
+- Student Action: (What students are actively writing, discussing, or solving)
+- Pedagogical Method: (Direct Instruction / Inquiry / Think-Pair-Share / Interactive Discussion)
+- In-Class Check for Understanding: (Quick question or observation check during this stage)
+---
 
-## 4. Learning Objectives
-Provide 3–6 measurable objectives.
+6. KEY CONCEPTS, DEFINITIONS & BOARD SUMMARY
+Provide what the teacher should write on the blackboard for visual reinforcement:
+• Core Term 1: Definition and student-friendly explanation
+• Core Term 2: Definition and student-friendly explanation
+• Key Concept Summary / Flow Diagram (in structured text)
+• Common Misconception & Correction: (State common student error and the exact remedy)
 
-## 5. Learning Outcomes
-Cover knowledge, understanding, application, and higher-order performance where appropriate.
+7. INTERACTIVE ACTIVITY / APPLICATION TASK
+• Activity Name:
+• Grouping: (Individual / Pairs / Groups of 4)
+• Task Description: (Concrete step-by-step activity instructions for students)
+• Expected Output: (What students produce by the end of the activity)
 
-## 6. Bloom’s Taxonomy
-Map suitable objectives/questions to Remember, Understand, Apply, Analyse, Evaluate, Create. Do not force all levels.
+8. DIFFERENTIATED INSTRUCTION STRATEGY
+• For Support / Remedial Learners: (Scaffolding strategy, simplified cue, or targeted prompt)
+• For Grade-Level Learners: (Core expected practice task)
+• For Advanced Learners: (High-Order Thinking extension challenge or open inquiry)
 
-## 7. Previous Knowledge
-- Prerequisites
-- Diagnostic questions
-- Expected responses
-- Teacher action if prerequisites are weak
+9. FORMATIVE ASSESSMENT & QUICK CHECKS
+• Question 1 (Conceptual): [Question with model answer]
+• Question 2 (Analytical/Application): [Question with model answer]
+• Question 3 (Case/Scenario-Based): [Question with model answer]
 
-## 8. Key Concepts & Vocabulary
-Give terms, definitions, formulae/rules where relevant, and student-friendly explanations.
+10. LESSON CLOSURE & EXIT TICKET (Estimated: 5 Mins)
+• 3 Key Takeaways to Summarize
+• Exit Ticket Prompt: (1 rapid written question for students to submit before leaving)
+• Bridge to Next Lesson: (What topic comes next and how this lesson connects to it)
 
-## 9. Teaching-Learning Resources
-List only resources actually needed. Include a backup if technology is used.
-
-## 10. Lesson Introduction / Set Induction
-Give a 5–10 minute opening with:
-- Teacher action
-- Student response
-- Engagement question
-- Prior knowledge activation
-- Transition
-
-## 11. Detailed Teaching-Learning Process
-Use this table format:
-Time | Concept/Phase | Teacher Activity | Student Activity | Teaching Method | Resources | Assessment
-
-Allocate realistic time. Total time must not exceed the specified lesson duration.
-
-## 12. Concept-wise Teaching Guidance
-For each major concept:
-- What the teacher explains
-- Example
-- Real-life connection
-- Teacher questions
-- Expected responses
-- Common misconception
-- Corrective explanation
-- Quick check
-
-## 13. Pedagogical Strategy
-State the primary method and why it fits.
-
-## 14. Activity-Based / Experiential Learning
-If suitable:
-- Activity name
-- Objective
-- Duration
-- Grouping
-- Materials
-- Procedure
-- Teacher role
-- Student role
-- Expected outcome
-- Safety precautions if relevant
-
-## 15. Competency-Based Learning
-Provide:
-- Competency
-- Real-world scenario
-- Student task
-- Expected evidence
-
-## 16. Question Bank
-Generate suitable questions under:
-- Recall
-- Understanding
-- Application
-- Analysis
-- HOTS/Evaluation
-- Creation, if appropriate
-Include answers/model answers only where useful to the teacher.
-
-## 17. Formative Assessment
-Include 3–5 checks that can be used during the lesson.
-
-## 18. Differentiated Instruction
-Provide:
-A. Support/remedial learners
-B. Grade-level learners
-C. Advanced learners
-
-## 19. Inclusive Classroom Strategies
-Give general, practical strategies without inventing student-specific conditions.
-
-## 20. Real-Life / Cross-Curricular Integration
-Include only if genuinely relevant.
-
-## 21. Technology Integration
-Give tool/use instructions and a non-digital alternative.
-
-## 22. Student Practice
-Include guided practice, independent practice, and a challenge question where appropriate.
-
-## 23. End-of-Lesson Assessment
-Choose appropriate formats:
-- MCQ
-- short answer
-- numerical
-- case/application
-- practical
-- creative response
-
-## 24. Exit Ticket
-Give 2–3 concise questions.
-
-## 25. Homework
-Provide:
-- Core practice
-- Application task
-- Optional challenge/enrichment
-Keep workload realistic for the class.
-
-## 26. Remedial Plan
-Specify what to reteach and how.
-
-## 27. Enrichment Plan
-Provide an extension task for advanced learners.
-
-## 28. Lesson Closure
-Summarize 3–5 key takeaways and connect to the next lesson.
-
-## 29. Teacher Reflection
-Provide a fillable checklist/prompts:
-- Objectives achieved?
-- Difficult concepts?
-- Student engagement?
-- Students needing support?
-- What worked?
-- What should change?
-
-## 30. Next Lesson Connection
-State:
-- Next topic
-- Bridge from this lesson
-- Prerequisite for next lesson
-- Teacher preparation
-- Student preparation
-
-QUALITY CHECK BEFORE FINAL OUTPUT
-- Is the lesson appropriate for the class?
-- Is it appropriate for the subject?
-- Is the difficulty realistic?
-- Does the timing add up?
-- Are teacher and student roles clear?
-- Are assessment questions aligned with objectives?
-- Are activities feasible?
-- Are there no unsupported official references?
-- Is the language clear enough for a teacher to use immediately?
-- Are irrelevant sections omitted?
-- Is the output free from unnecessary repetition?
-
-Return ONLY the completed lesson plan, not your internal reasoning.
+11. HOMEWORK & INDEPENDENT PRACTICE
+• Core Practice Task: (Review and textbook consolidation)
+• Application / Mini-Research Task: (Real-world or analytical assignment)
+• Estimated Completion Time: (e.g., 20 minutes)
 `;
 
         const aiResult = await model.generateContent(prompt);
         const lessonPlanText = aiResult.text;
 
-        // ✅ Log AI Usage
+        // Log AI Usage
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard", 
@@ -315,6 +166,7 @@ Return ONLY the completed lesson plan, not your internal reasoning.
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
+        // Save record to DB
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
