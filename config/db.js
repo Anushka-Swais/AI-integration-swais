@@ -19,10 +19,11 @@ const pool = new Pool({
   // ✅ Keep these stability settings to prevent timeouts on big AI requests
   connectionTimeoutMillis: 15000, 
   idleTimeoutMillis: 30000,       
-  keepAlive: true                 
+  keepAlive: true                
 });
 
-// ✅ NEW: Test the database connection on server startup
+// ✅ NEW: Test the database connection on server startup (COMMENTED OUT TO BYPASS AWS FIREWALL)
+/*
 pool.connect((err, client, release) => {
   if (err) {
     console.error('🚨 CRITICAL: Failed to connect to AWS RDS Database!');
@@ -33,6 +34,7 @@ pool.connect((err, client, release) => {
     release(); // Release the client back to the pool
   }
 });
+*/
 
 // Handle unexpected errors on idle clients
 pool.on('error', (err) => {

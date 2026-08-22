@@ -46,7 +46,8 @@ app.post('/api/v1/community/doubt', postDoubt);
 app.get('/api/v1/community/doubts', getCommunityDoubts);
 app.post('/api/v1/community/answer', answerDoubt);
 
-// 🔍 DATABASE CONNECTION TEST
+// 🔍 DATABASE CONNECTION TEST (COMMENTED OUT TO BYPASS AWS FIREWALL)
+/*
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error("❌ Database Connection Failed:", err.message);
@@ -54,6 +55,7 @@ pool.query('SELECT NOW()', (err, res) => {
     console.log("✅ Database Connected Successfully!");
   }
 });
+*/
 
 app.listen(PORT, () => {
   console.log(`🚀 Modular AI Server running cleanly on port ${PORT}`);
