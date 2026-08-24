@@ -3,316 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SWAIS Sleek Lesson Planner Test</title>
+    <title>SGS Faculty - Lesson Planner Test</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a2e; /* Matches your dark background */
-            color: #333;
-            margin: 0;
-            padding: 40px;
-            display: flex;
-            gap: 30px;
-            justify-content: center;
-        }
-
-        /* --- LEFT PANEL: THE FORM UI --- */
-        .planner-card {
-            background: #ffffff;
-            border-radius: 16px;
-            width: 100%;
-            max-width: 550px;
-            padding: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-
-        .alert-banner {
-            background-color: #f0f4ff;
-            border: 1px solid #d6e4ff;
-            color: #4a6ee0;
-            padding: 12px 16px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 24px;
-            cursor: pointer;
-        }
-
-        .alert-banner span.view-result {
-            color: #6b8cff;
-            font-size: 13px;
-        }
-
-        .header-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 5px;
-        }
-
-        .header-title h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #111;
-        }
-
-        .header-subtitle {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 24px;
-        }
-
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 6px;
-            margin-top: 16px;
-        }
-
-        input[type="text"], select, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #333;
-            box-sizing: border-box;
-            outline: none;
-            transition: border 0.2s;
-        }
-
-        input[type="text"]:focus, select:focus, textarea:focus {
-            border-color: #8b5cf6;
-        }
-
-        /* Duration Slider Styling */
-        .slider-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
-        
-        .duration-label { margin-top: 0; }
-        
-        .duration-value {
-            background: #f0f4ff;
-            color: #4a6ee0;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            accent-color: #8b5cf6;
-            margin-top: 10px;
-        }
-
-        .slider-marks {
-            display: flex;
-            justify-content: space-between;
-            font-size: 10px;
-            color: #999;
-            margin-top: 4px;
-            padding: 0 5px;
-        }
-
-        .add-btn {
-            color: #6c5ce7;
-            font-size: 13px;
-            font-weight: 600;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px 0;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #8b5cf6 0%, #6c5ce7 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 24px;
-            transition: opacity 0.2s;
-        }
-
-        .submit-btn:hover { opacity: 0.9; }
-        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* --- RIGHT PANEL: OUTPUT & DOWNLOAD --- */
-        .output-panel {
-            background: #2a2a40;
-            border-radius: 16px;
-            width: 100%;
-            max-width: 600px;
-            padding: 24px;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .output-panel h3 { margin-top: 0; color: #fff; }
-
-        pre {
-            background: #1e1e2f;
-            padding: 15px;
-            border-radius: 8px;
-            color: #00d2d3;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            flex-grow: 1;
-            border: 1px solid #444;
-            font-size: 13px;
-            min-height: 400px;
-        }
-
-        .download-btn {
-            background-color: #00b894;
-            color: white;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            display: none;
-            margin-bottom: 15px;
-            align-self: flex-start;
-        }
-
-        .download-btn:hover { background-color: #009688; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #1e1e2e; color: #cdd6f4; padding: 20px; display: flex; gap: 20px; }
+        .panel { background: #313244; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); flex: 1; }
+        h2 { margin-top: 0; color: #89b4fa; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #a6adc8; }
+        input, select, button { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #45475a; border-radius: 4px; box-sizing: border-box; background: #181825; color: #cdd6f4; }
+        button { background-color: #89b4fa; color: #11111b; font-size: 16px; cursor: pointer; border: none; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: #74c7ec; }
+        #downloadBtn { background-color: #a6e3a1; display: none; margin-top: 15px; }
+        #downloadBtn:hover { background-color: #94e2d5; }
+        pre { background: #11111b; color: #a6adc8; padding: 15px; border-radius: 4px; overflow-x: auto; min-height: 400px; white-space: pre-wrap; border: 1px solid #45475a; }
+        .loading { display: none; color: #f9e2af; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- LEFT PANEL: UI FORM -->
-    <div class="planner-card">
-        <div class="alert-banner">
-            <span>✨ Your last generated plan is ready</span>
-            <span class="view-result">View result ></span>
-        </div>
+    <div class="panel">
+        <h2>📚 AI Lesson Planner</h2>
+        <form id="lessonForm">
+            <label for="chapterId">Chapter ID:</label>
+            <input type="number" id="chapterId" value="101" required>
 
-        <div class="header-title">
-            <span style="background: #8b5cf6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px;">📝</span>
-            <h3>Plan Details</h3>
-        </div>
-        <div class="header-subtitle">Fill in the details below</div>
+            <label for="topic">Topic / Chapter Name:</label>
+            <input type="text" id="topic" value="Magnetic Effects of Electric Current" required>
 
-        <form id="plannerForm">
-            <!-- 🚨 IMPORTANT: Value must match an actual ID in your local DB -->
-            <label>Chapter *</label>
-            <select id="chapterId" required>
-                <option value="1">Chapter 4 - The Colonial Era in India (ID: 1)</option>
-                <option value="2">Chapter 1 - Natural Resources (ID: 2)</option>
-                <!-- Add your actual local DB chapter IDs here to test -->
+            <label for="classLevel">Class Level:</label>
+            <select id="classLevel" required>
+                <option value="Class 8">Class 8</option>
+                <option value="Class 9">Class 9</option>
+                <option value="Class 10" selected>Class 10</option>
             </select>
 
-            <label>Specific Topic (optional)</label>
-            <input type="text" id="topic" placeholder="e.g. Preamble and Fundamental Rights">
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" value="Physics" required>
 
-            <div style="margin-top: 20px;">
-                <div class="slider-container">
-                    <label class="duration-label">Duration</label>
-                    <span class="duration-value" id="durationDisplay">45 min</span>
-                </div>
-                <input type="range" id="duration" min="30" max="90" step="15" value="45">
-                <div class="slider-marks">
-                    <span>30 min</span>
-                    <span>60 min</span>
-                    <span>90 min</span>
-                </div>
-            </div>
+            <label for="durationMinutes">Duration (Minutes):</label>
+            <input type="number" id="durationMinutes" value="45" required>
 
-            <label>Custom Objectives (or leave blank for AI defaults)</label>
-            <div id="objectivesContainer">
-                <input type="text" class="objective-input" placeholder="Objective 1">
-            </div>
-            <button type="button" class="add-btn" id="addObjectiveBtn">+ Add objective</button>
-
-            <label>Special Notes (optional)</label>
-            <textarea id="specialNotes" rows="3" placeholder="e.g. Include a debate activity, focus on rural students' context..."></textarea>
-
-            <button type="submit" class="submit-btn" id="generateBtn">✨ Generate with AI ✨</button>
+            <button type="submit">Generate Lesson Plan</button>
+            <div class="loading" id="loadingIndicator">🧠 AI is thinking... Please wait.</div>
         </form>
     </div>
 
-    <!-- RIGHT PANEL: PREVIEW & DOWNLOAD -->
-    <div class="output-panel">
-        <h3>Backend Response Preview</h3>
-        <button id="downloadBtn" class="download-btn">📥 Download Lesson Plan (.md)</button>
-        <pre id="responseOutput">Configure the sleek UI on the left and hit "Generate with AI" to test your backend...</pre>
+    <div class="panel">
+        <h2>📝 AI Output</h2>
+        <pre id="responseOutput">Fill out the form and hit "Generate" to see the magic happen...</pre>
+        <button id="downloadBtn">⬇️ Download Lesson Plan (.txt)</button>
     </div>
 
     <script>
-        let generatedText = ""; 
+        let generatedContent = "";
 
-        // Update Slider Text dynamically
-        const durationSlider = document.getElementById('duration');
-        const durationDisplay = document.getElementById('durationDisplay');
-        durationSlider.addEventListener('input', (e) => {
-            durationDisplay.textContent = `${e.target.value} min`;
-        });
-
-        // Add extra objective fields dynamically
-        document.getElementById('addObjectiveBtn').addEventListener('click', () => {
-            const container = document.getElementById('objectivesContainer');
-            const inputCount = container.querySelectorAll('input').length + 1;
-            const newInput = document.createElement('input');
-            newInput.type = 'text';
-            newInput.className = 'objective-input';
-            newInput.placeholder = `Objective ${inputCount}`;
-            newInput.style.marginTop = '10px';
-            container.appendChild(newInput);
-        });
-
-        // Form Submit Handler
-        document.getElementById('plannerForm').addEventListener('submit', async function(e) {
+        document.getElementById('lessonForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const outputArea = document.getElementById('responseOutput');
-            const generateBtn = document.getElementById('generateBtn');
+            const loader = document.getElementById('loadingIndicator');
+            const submitBtn = document.querySelector('button[type="submit"]');
             const downloadBtn = document.getElementById('downloadBtn');
             
-            // Gather all custom objectives into a single string
-            const objectives = Array.from(document.querySelectorAll('.objective-input'))
-                                   .map(input => input.value)
-                                   .filter(val => val.trim() !== '')
-                                   .join('; ');
-
-            // Build Payload
             const payload = {
-                chapterId: document.getElementById('chapterId').value,
+                chapterId: parseInt(document.getElementById('chapterId').value),
                 topic: document.getElementById('topic').value,
-                durationMinutes: document.getElementById('duration').value,
-                // Passing your UI notes to the backend variables
-                customObjectives: objectives, 
-                teacherInstructions: document.getElementById('specialNotes').value,
-                userInfo: { id: 3, name: "SWAIS Faculty" }
+                classLevel: document.getElementById('classLevel').value,
+                subject: document.getElementById('subject').value,
+                durationMinutes: parseInt(document.getElementById('durationMinutes').value),
+                userInfo: { id: 3, name: "Anushka" } 
             };
 
-            // UI feedback
-            outputArea.textContent = "Connecting to AI... Please wait.";
-            generateBtn.disabled = true;
-            generateBtn.textContent = "Generating...";
+            outputArea.textContent = "";
+            loader.style.display = 'block';
+            submitBtn.disabled = true;
             downloadBtn.style.display = 'none';
 
             try {
-                // 🚨 Pointing to port 5000 based on your .env settings 🚨
-                const API_URL = 'http://localhost:5000/api/lesson-plan'; 
+                // Pointing to your local port 5000 and the exact teacher route!
+                const API_URL = 'http://localhost:5000/api/v1/ai/teacher/lesson-plan'; 
 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -322,34 +90,29 @@
 
                 const data = await response.json();
                 
-                if (!response.ok) throw new Error(data.error || "Unknown error occurred.");
-
-                // Display response
-                generatedText = data.lessonPlan;
-                outputArea.textContent = generatedText;
-                downloadBtn.style.display = 'block';
-
+                if (data.error) {
+                    outputArea.textContent = "Error: " + data.error + "\nDetails: " + (data.details || "");
+                } else {
+                    generatedContent = data.lessonPlan;
+                    outputArea.textContent = generatedContent;
+                    downloadBtn.style.display = 'block'; 
+                }
             } catch (error) {
                 console.error("Error:", error);
-                outputArea.textContent = "❌ Request Failed.\n\nError Details: " + error.message;
+                outputArea.textContent = "Request Failed. Is your Node.js backend running?\n\nError: " + error.message;
             } finally {
-                generateBtn.disabled = false;
-                generateBtn.textContent = "✨ Generate with AI ✨";
+                loader.style.display = 'none';
+                submitBtn.disabled = false;
             }
         });
 
         // Download Logic
         document.getElementById('downloadBtn').addEventListener('click', function() {
-            if (!generatedText) return;
-            const blob = new Blob([generatedText], { type: 'text/markdown' });
+            const blob = new Blob([generatedContent], { type: 'text/plain' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            
-            // Generate a smart filename
-            const topicName = document.getElementById('topic').value || 'Lesson_Plan';
-            a.download = `${topicName.replace(/\s+/g, '_')}.md`; 
-            
+            a.download = `SGS_LessonPlan_${document.getElementById('topic').value.replace(/\s+/g, '_')}.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
