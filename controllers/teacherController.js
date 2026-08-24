@@ -24,7 +24,7 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (CBSE AP UNIFIED FORMAT)
+// 1. AUTO LESSON PLANNER (GODAVARI DEVI SARAF FORMAT)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
@@ -32,11 +32,18 @@ export const generateLessonPlan = async (req, res) => {
         durationMinutes = 45, 
         userInfo,
         classLevel = 'Not specified',
+        section = 'Not specified',
         subject = 'Not specified',
-        topic
+        topic,
+        designation = 'Teacher',
+        noOfPeriods = 'Not specified',
+        dateOfCommencement = 'Not specified',
+        expectedCompletion = 'Not specified',
+        actualCompletion = 'Not specified'
     } = req.body;
 
-    const teacherId = userInfo?.id || 3; 
+    const teacherId = userInfo?.id || 3;
+    const teacherName = userInfo?.name || 'Not specified';
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
@@ -51,12 +58,11 @@ export const generateLessonPlan = async (req, res) => {
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert CBSE master teacher creating a highly detailed, practical guide for a faculty member in Andhra Pradesh.
+You are an expert school teacher creating a highly detailed, practical lesson plan.
 
 Topic: "${finalTopic}"
-Class: ${classLevel}
+Class & Section: ${classLevel} ${section}
 Subject: ${subject}
-Duration: ${durationMinutes} Minutes
 
 Use ONLY the following textbook content:
 """
@@ -64,35 +70,48 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTION:
-Do NOT write vague summaries. You MUST write exact teaching scripts, real-world examples, and specific methodologies. Do NOT use markdown bolding (**) or asterisks.
+Do NOT write vague summaries. You MUST write exact teaching strategies, real-world activities, and specific assessment methods. 
+Do NOT use markdown bolding (**) or asterisks to prevent UI formatting glitches.
+You MUST strictly follow the exact structure and spacing below. Do not add any extra sections.
 
 REQUIRED EXACT STRUCTURE:
 
-Lesson Plan: ${finalTopic}
+SMT. GODAVARI DEVI SARAF SENIOR SECONDARY SCHOOL, SHREERAMNAGAR
+LESSON PLAN
 
-I. Pedagogical Intent & Target Outcomes
-• Learning Objectives: [Write 3 specific, measurable outcomes]
-• Chapter Gist: [Brief summary of core themes]
-• Keywords: [List 4-5 core vocabulary words]
+Name of the teacher: ${teacherName}
+Designation: ${designation}
+Class & Section: ${classLevel} ${section}
+Subject: ${subject}
+Chapter: ${finalTopic}
+No. Of Periods: ${noOfPeriods}
+Date of Commencement: ${dateOfCommencement}
+Expected date of completion: ${expectedCompletion}
+Actual date of completion: ${actualCompletion}
 
-II. Prerequisite Diagnostic & Hook Activity
-• The Hook: [Write the EXACT script/diagnostic question the teacher must ask to test prior knowledge]
+Learning objectives:
+[Write 3-4 specific, measurable learning objectives based on the chapter content]
 
-III. Micro-Period Distribution Matrix
-Period / Time | Core Sub-Topic Target | Active Methodology & Strategies
-[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
-[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
-[Time segment] | [Specific sub-topic] | [Detailed explanation script, real-world analogies, and exactly what the teacher should do]
+Learning outcomes:
+[Write 3-4 clear outcomes detailing what students will achieve]
 
-IV. Inclusive Infrastructure & Cross-Curricular Integration
-• Art Integration / Differentiation: [1 specific strategy to integrate art or support diverse learners]
+Methodology:
+[Detail the exact teaching methods, pedagogical approaches, and step-by-step strategies the teacher will use]
 
-V. Assessment Framework
-• HOTS Prompt: [Write 1 challenging Higher Order Thinking Skills question to ask the class]
-• Home Assignment: [1 highly specific homework assignment related to the textbook]
+TLM:
+[List the Teaching Learning Materials required, e.g., textbook pages, charts, digital aids]
 
-VI. Post-Lesson Reflective Log
-[To be filled out post-delivery - leave a blank placeholder line here]
+Activities:
+[Provide step-by-step descriptions of 1-2 interactive classroom activities related to the topic]
+
+Assessment:
+[Detail the exact questions, exit tickets, or formative checks to evaluate student understanding]
+
+Home Work:
+[Provide 1-2 specific homework tasks related to the lesson]
+
+
+Sign of the Teacher                                          Sign of the Dean
 `;
 
         const aiResult = await model.generateContent(prompt);
