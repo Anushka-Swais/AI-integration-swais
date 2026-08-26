@@ -23,7 +23,7 @@ export const logAIUsage = async (userInfo = {}, moduleName, featureName, usageMe
 
     try {
         await pool.query(
-            `INSERT INTO ai_usage_logs 
+            `INSERT INTO sgs_ai_usage_logs 
             (client_name, user_email, module_name, feature_used, prompt_tokens, completion_tokens, total_tokens, created_at_ist) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [clientName, email, moduleName, featureName, promptTokens, completionTokens, totalTokens, istTime]
