@@ -35,7 +35,7 @@ export const handleStudentChat = async (req, res) => {
     try {
         // Save student's message
         await pool.query(
-            `INSERT INTO ai_chat_messages
+            `INSERT INTO sgs_ai_chat_messages
             (student_id, role, message_content, created_at)
             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [studentId, "user", message]
@@ -87,7 +87,7 @@ Student's message:
 
         // Save AI reply
         await pool.query(
-            `INSERT INTO ai_chat_messages
+            `INSERT INTO sgs_ai_chat_messages
             (student_id, role, message_content, created_at)
             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [studentId, "ai", aiReply]

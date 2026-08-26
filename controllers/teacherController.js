@@ -612,7 +612,7 @@ export const teacherChatbot = async (req, res) => {
         const historyResult = await pool.query(
             `SELECT role, message_content FROM (
                 SELECT role, message_content, created_at 
-                FROM ai_chat_messages 
+                FROM sgs_ai_chat_messages 
                 WHERE student_id = $1 
                 ORDER BY created_at DESC 
                 LIMIT 10
@@ -659,7 +659,7 @@ IMPORTANT RESPONSE RULES:
 `;
     
         await pool.query(
-            `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            `INSERT INTO sgs_ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'user', message]
         );
 
@@ -669,7 +669,7 @@ IMPORTANT RESPONSE RULES:
         await logAIUsage(userInfo, "Teacher Dashboard", "Teacher AI Chatbot", aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
         await pool.query(
-            `INSERT INTO ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            `INSERT INTO sgs_ai_chat_messages (student_id, role, message_content, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [userId, 'ai', aiReply]
         );
 

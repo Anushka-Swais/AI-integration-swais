@@ -40,7 +40,7 @@ async def log_ai_usage(user_info, module_name, feature_name, usage_metadata=None
     try:
         await pool.execute(
             """
-            INSERT INTO ai_usage_logs
+            INSERT INTO sgs_ai_usage_logs
             (client_name, user_email, module_name, feature_used, prompt_tokens, completion_tokens, total_tokens, created_at_ist)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             """,
