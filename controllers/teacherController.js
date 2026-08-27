@@ -58,23 +58,16 @@ export const generateLessonPlan = async (req, res) => {
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
         const prompt = `
-You are an expert school teacher creating a highly detailed, practical lesson plan.
-
-Topic: "${finalTopic}"
-Class & Section: ${classLevel} ${section}
-Subject: ${subject}
-
-Use ONLY the following textbook content:
+You are an expert, highly experienced school teacher. Your task is to write a comprehensive and deeply detailed lesson plan for the topic "${finalTopic}".
+You MUST base your entire lesson plan STRICTLY on the following textbook content:
 """
 ${full_text_content}
 """
 
-CRITICAL INSTRUCTION:
-Do NOT write vague summaries. You MUST write exact teaching strategies, real-world activities, and specific assessment methods. 
-Do NOT use markdown bolding (**) or asterisks to prevent UI formatting glitches.
-You MUST strictly follow the exact structure and spacing below. Do not add any extra sections.
-
-REQUIRED EXACT STRUCTURE:
+CRITICAL INSTRUCTIONS:
+1. Act like a real teacher planning a detailed, practical lesson. NO generic filler. Write exact teaching strategies, specific real-world examples, and precise questions you will ask.
+2. Format the output EXACTLY matching the structure below. Do not add any extra headings, JSON, or markdown code blocks.
+3. Fill in the bracketed areas with deep, faculty-level detail.
 
 SMT. GODAVARI DEVI SARAF SENIOR SECONDARY SCHOOL, SHREERAMNAGAR
 LESSON PLAN
@@ -90,28 +83,27 @@ Expected date of completion: ${expectedCompletion}
 Actual date of completion: ${actualCompletion}
 
 Learning objectives:
-[Write 3-4 specific, measurable learning objectives based on the chapter content]
+[Write 3-4 specific, measurable objectives using action verbs. E.g., "Students will be able to calculate...", "Students will identify..."]
 
 Learning outcomes:
-[Write 3-4 clear outcomes detailing what students will achieve]
+[Write 3-4 specific outcomes detailing exactly what students will demonstrate by the end of the lesson.]
 
 Methodology:
-[Detail the exact teaching methods, pedagogical approaches, and step-by-step strategies the teacher will use]
+[Provide a detailed, step-by-step teaching method. E.g., "1. Hook: Start by showing... 2. Direct Instruction: Explain the concept using [specific analogy]. 3. Guided Practice: Solve problem X together..."]
 
 TLM:
-[List the Teaching Learning Materials required, e.g., textbook pages, charts, digital aids]
+[List specific Teaching Learning Materials. E.g., "Textbook page X, Smartboard presentation on Y, physical props like Z"]
 
 Activities:
-[Provide step-by-step descriptions of 1-2 interactive classroom activities related to the topic]
+[Detail 1-2 specific classroom activities. E.g., "Think-Pair-Share: Students will pair up to solve...", or "Group Activity: Groups of 4 will analyze..."]
 
 Assessment:
-[Detail the exact questions, exit tickets, or formative checks to evaluate student understanding]
+[List 2-3 exact questions you will ask to check understanding, or describe a specific exit ticket task.]
 
 Home Work:
-[Provide 1-2 specific homework tasks related to the lesson]
+[Give a specific, actionable homework assignment related to the exact text provided.]
 
-
-Sign of the Teacher                                          Sign of the Dean
+Sign. of the Teacher                                          Sign. of the Dean.
 `;
 
         const aiResult = await model.generateContent(prompt);
