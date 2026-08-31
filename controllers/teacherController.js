@@ -136,31 +136,37 @@ Sign. of the Teacher                                          Sign. of the Dean.
 // 2. AUTO QUESTION PAPER GENERATOR (CBSE AP BLUEPRINT)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
-    const { 
-        chapterId, 
-        difficulty = 'Medium', 
-        questionType = 'All', 
-        totalMarks = 50,
-        classLevel = 'Class 8', 
-        subject = 'Select',
-        userInfo 
-    } = req.body;
-
-    const teacherId = userInfo?.id || 3; 
-
-    if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
-
-    const validMarks = [10, 20, 30, 50, 70, 80, 100];
-    if (!validMarks.includes(parseInt(totalMarks))) {
-        return res.status(400).json({ error: "Total marks must be valid." });
-    }
-
-    const validDifficulties = ['Easy', 'Medium', 'Hard'];
-    const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
-
     try {
+        // 1. Extract parameters inside the try block to prevent Express plain-text errors
+        const body = req.body || {};
+        const { 
+            chapterId, 
+            difficulty = 'Medium', 
+            questionType = 'All', 
+            totalMarks = 50,
+            classLevel = 'Class 8', 
+            subject = 'Select',
+            userInfo 
+        } = body;
+
+        // 2. Guard against the UI sending placeholder text when dropdowns aren't selected
+        if (!chapterId || chapterId === 'Select chapter first' || String(chapterId).includes('Select')) {
+            return res.status(400).json({ error: "Please select a valid Class, Subject, and Chapter before generating." });
+        }
+
+        const validMarks = [10, 20, 30, 50, 70, 80, 100];
+        if (!validMarks.includes(parseInt(totalMarks))) {
+            return res.status(400).json({ error: "Total marks must be valid." });
+        }
+
+        const validDifficulties = ['Easy', 'Medium', 'Hard'];
+        const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
+
+        const teacherId = userInfo?.id || 3; 
+
         const schoolResult = await pool.query('SELECT school_name FROM sgs_school_name LIMIT 1');
         const school_name = schoolResult.rows[0]?.school_name || '';
+
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
@@ -244,6 +250,7 @@ ANSWER KEY & MARKING SCHEME
 
     } catch (err) {
         console.error("🚨 QUESTION PAPER CRASH:", err);
+        // This ensures ANY failure returns JSON, preventing frontend parsing errors
         res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
     }
 };
