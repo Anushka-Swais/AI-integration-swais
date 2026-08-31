@@ -41,13 +41,16 @@ export const generateLessonPlan = async (req, res) => {
         expectedCompletion = 'Not specified',
         actualCompletion = 'Not specified'
     } = req.body;
-
+    
     const teacherId = userInfo?.id || 3;
     const teacherName = userInfo?.name || 'Not specified';
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
+        const schoolResult = await pool.query('SELECT school_name FROM sgs_school_name LIMIT 1');
+        const school_name = schoolResult.rows[0]?.school_name || '';
+
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
@@ -156,6 +159,8 @@ export const generateQuestionPaper = async (req, res) => {
     const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
 
     try {
+        const schoolResult = await pool.query('SELECT school_name FROM sgs_school_name LIMIT 1');
+        const school_name = schoolResult.rows[0]?.school_name || '';
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
