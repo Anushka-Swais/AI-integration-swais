@@ -191,7 +191,7 @@ CRITICAL INSTRUCTIONS:
 
 REQUIRED EXACT STRUCTURE:
 
-SGS
+${school_name}
 PERIODIC / CLASS TEST – 2026-27
 Subject: ${subject}  |  Class: ${classLevel}
 Chapter: ${chapter_name}  |  Time: Adjust based on marks  |  Maximum Marks: ${totalMarks}
