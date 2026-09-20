@@ -137,7 +137,6 @@ Sign. of the Teacher                                          Sign. of the Dean.
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     try {
-        // 1. Extract parameters inside the try block to prevent Express plain-text errors
         const body = req.body || {};
         const { 
             chapterId, 
@@ -149,7 +148,6 @@ export const generateQuestionPaper = async (req, res) => {
             userInfo 
         } = body;
 
-        // 2. Guard against the UI sending placeholder text when dropdowns aren't selected
         if (!chapterId || chapterId === 'Select chapter first' || String(chapterId).includes('Select')) {
             return res.status(400).json({ error: "Please select a valid Class, Subject, and Chapter before generating." });
         }
@@ -178,6 +176,12 @@ export const generateQuestionPaper = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
+        // Conditional logic to enforce the specific question type if one is requested
+        const isSpecificType = questionType && questionType.toLowerCase() !== 'all';
+        const typeInstruction = isSpecificType 
+            ? `Generate ONLY questions of type: "${questionType}". The entire paper MUST consist exclusively of this question type. Do not divide the paper into sections.`
+            : `Generate a balanced mix of objective, short answer, and long answer questions.`;
+
         const prompt = `
 You are an expert school exam paper setter.
 Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
@@ -188,6 +192,7 @@ Class: ${classLevel}
 Subject: ${subject}
 Difficulty: ${validatedDifficulty}
 Total Marks: ${totalMarks}
+Requested Format: ${questionType}
 
 TEXTBOOK CONTENT TO USE:
 """
@@ -195,49 +200,25 @@ ${full_text_content}
 """
 
 CRITICAL INSTRUCTIONS:
-1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}. Distribute the marks proportionally across Sections A to E based on standard CBSE blueprints.
+1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
 2. Base all questions strictly on the provided text. Do not invent facts.
 3. Complexity MUST match the ${validatedDifficulty} level.
-4. FORMAT: Return a clean, human-readable Question Paper layout. Do NOT return JSON. Do NOT use markdown bolding (**) or asterisks.
+4. ${typeInstruction}
+5. You MUST return STRICTLY a JSON array of objects. Do not use markdown formatting outside the JSON block. Do not include plain text headers.
 
-REQUIRED EXACT STRUCTURE:
-
-${school_name}
-PERIODIC / CLASS TEST – 2026-27
-Subject: ${subject}  |  Class: ${classLevel}
-Chapter: ${chapter_name}  |  Time: Adjust based on marks  |  Maximum Marks: ${totalMarks}
-Name: ________________________ | Roll No.: ________________
-Section: __________ | Date: ________________
-
-General Instructions
-All questions are compulsory.
-The question paper consists of Sections A, B, C, D and E.
-
-SECTION A – Objective Type Questions (1 Mark Each)
-[Generate MCQs, fill-in items, and Assertion-Reasoning pairings]
-
-SECTION B – Very Short Answer Questions (2 Marks Each)
-[Generate direct questions. Answers should be 30 to 50 words]
-
-SECTION C – Short Answer Questions (3 Marks Each)
-[Generate brief explanations or mid-tier logic. Answers should be 50 to 80 words]
-
-SECTION D – Long Answer Questions (5 Marks Each)
-[Generate detailed essay-style questions. Answers should be 80 to 120 words. Include strict internal choices like 'Answer this OR that']
-
-SECTION E – Case-Based / Source (4 Marks Each)
-[Generate integrated competency prompts evaluating a text block or case snippet based on the content]
-
-— END OF QUESTION PAPER —
-
-===================================================================
-ANSWER KEY & MARKING SCHEME
-===================================================================
-[Provide exact answers for all questions enforcing the word limits.]
+Ensure the output EXACTLY matches this schema:
+[
+  {
+    "question": "The question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"], // Provide an array of strings for MCQs, otherwise set to null
+    "answer": "The correct answer and any marking scheme/explanation",
+    "marks": Number, // e.g., 1, 2, 3, 4, 5
+    "type": "${isSpecificType ? questionType : 'String (e.g., MCQ, Short Answer, Long Answer)'}"
+  }
+]
 `;
 
         const aiResult = await model.generateContent(prompt);
-        const paperText = aiResult.text;
         
         await logAIUsage(
             userInfo, 
@@ -246,11 +227,20 @@ ANSWER KEY & MARKING SCHEME
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
-        res.json({ questionPaper: paperText });
+        // Strip markdown backticks and extract JSON array
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+        
+        if (!jsonMatch) {
+            throw new Error("Failed to parse AI output into valid JSON array structure.");
+        }
+
+        const structuredQuestions = JSON.parse(jsonMatch[0]);
+
+        res.json({ questionPaper: structuredQuestions });
 
     } catch (err) {
         console.error("🚨 QUESTION PAPER CRASH:", err);
-        // This ensures ANY failure returns JSON, preventing frontend parsing errors
         res.status(500).json({ error: "Failed to generate question paper.", details: err.message });
     }
 };
