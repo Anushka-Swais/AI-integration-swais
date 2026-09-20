@@ -462,7 +462,8 @@ export const getSingleStudentAnalytics = async (req, res) => {
         let params = [`%${studentName}%`];
 
         if (subject !== "all") {
-            query += ` AND a.assessment_type ILIKE $2`;
+            // FIX: Cast enum to text for pattern matching
+            query += ` AND a.assessment_type::text ILIKE $2`;
             params.push(`%${subject}%`);
         }
 
@@ -526,7 +527,8 @@ export const getClassAnalytics = async (req, res) => {
         let params = [teacherId];
 
         if (subject !== "all") {
-            query += ` AND a.assessment_type ILIKE $2`;
+            // FIX: Cast enum to text for pattern matching
+            query += ` AND a.assessment_type::text ILIKE $2`;
             params.push(`%${subject}%`);
         }
 
