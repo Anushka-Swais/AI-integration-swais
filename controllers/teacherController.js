@@ -528,7 +528,7 @@ export const getClassAnalytics = async (req, res) => {
         `;
         let params = [teacherId];
 
-        // FIX: Guard against empty strings and query the correct 'subject' column
+        // Guard against empty strings and query the correct 'subject' column
         if (subject && subject !== "all") {
             query += ` AND a.subject ILIKE $2`;
             params.push(`%${subject}%`);
@@ -566,12 +566,14 @@ No $.
         
         await logAIUsage(userInfo, "Teacher Dashboard", `Class Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
-        res.json({ analyticsReport: aiResult.text, data: classData });
+        // FIX: Match the response keys used in getSingleStudentAnalytics
+        res.json({ analysis: aiResult.text, chartData: classData });
     } catch (err) {
         console.error("🚨 CLASS ANALYTICS CRASH:", err);
         res.status(500).json({ error: "Failed to generate class analytics.", details: err.message });
     }
 };
+
 
 // ==========================================
 // 9 & 10. LANGUAGE TRANSLATOR 
