@@ -440,7 +440,6 @@ Formatting Rules
 // 7. STUDENT ANALYTICS
 // ==========================================
 export const getSingleStudentAnalytics = async (req, res) => {
-    // FIX: Added studentId for exact matching to prevent name collisions
     const { studentId, studentName = "Aarav", subject = "all", userInfo } = req.body;
     
     try {
@@ -454,7 +453,6 @@ export const getSingleStudentAnalytics = async (req, res) => {
         
         let params = [];
         
-        // Use studentId if provided, fallback to full_name pattern matching
         if (studentId) {
             query += `s.student_id = $1`;
             params.push(studentId);
@@ -463,7 +461,6 @@ export const getSingleStudentAnalytics = async (req, res) => {
             params.push(`%${studentName}%`);
         }
 
-        // FIX: Guard against empty strings and query the correct 'subject' column
         if (subject && subject !== "all") {
             query += ` AND a.subject ILIKE $2`;
             params.push(`%${subject}%`);
@@ -471,10 +468,14 @@ export const getSingleStudentAnalytics = async (req, res) => {
 
         query += ` ORDER BY a.assessment_date DESC LIMIT 5;`;
         const dbResult = await pool.query(query, params);
+        const studentData = dbResult.rows;
 
-        let studentData = dbResult.rows;
+        // FIX: Return a static message immediately if no data exists, bypassing the AI
         if (studentData.length === 0) {
-            studentData = [{ test_name: "Mock Test", type: "Exam", score: 75 }];
+            return res.json({ 
+                analysis: "• Overall Performance: No academic data found for this student.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
+                chartData: [] 
+            });
         }
         
         const prompt = `
