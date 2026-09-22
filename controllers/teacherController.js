@@ -440,20 +440,32 @@ Formatting Rules
 // 7. STUDENT ANALYTICS
 // ==========================================
 export const getSingleStudentAnalytics = async (req, res) => {
-    const { studentName = "Aarav", subject = "all", userInfo } = req.body;
+    // FIX: Added studentId for exact matching to prevent name collisions
+    const { studentId, studentName = "Aarav", subject = "all", userInfo } = req.body;
+    
     try {
         let query = `
             SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
             FROM sgs_assessment_results ar
             JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
             JOIN sgs_student_master s ON ar.student_id = s.student_id
-            WHERE s.full_name ILIKE $1
+            WHERE 
         `;
-        let params = [`%${studentName}%`];
+        
+        let params = [];
+        
+        // Use studentId if provided, fallback to full_name pattern matching
+        if (studentId) {
+            query += `s.student_id = $1`;
+            params.push(studentId);
+        } else {
+            query += `s.full_name ILIKE $1`;
+            params.push(`%${studentName}%`);
+        }
 
-        if (subject !== "all") {
-            // FIX: Cast enum to text for pattern matching
-            query += ` AND a.assessment_type::text ILIKE $2`;
+        // FIX: Guard against empty strings and query the correct 'subject' column
+        if (subject && subject !== "all") {
+            query += ` AND a.subject ILIKE $2`;
             params.push(`%${subject}%`);
         }
 
@@ -516,9 +528,9 @@ export const getClassAnalytics = async (req, res) => {
         `;
         let params = [teacherId];
 
-        if (subject !== "all") {
-            // FIX: Cast enum to text for pattern matching
-            query += ` AND a.assessment_type::text ILIKE $2`;
+        // FIX: Guard against empty strings and query the correct 'subject' column
+        if (subject && subject !== "all") {
+            query += ` AND a.subject ILIKE $2`;
             params.push(`%${subject}%`);
         }
 
