@@ -441,11 +441,12 @@ Formatting Rules
 // 7. STUDENT ANALYTICS
 // ==========================================
 export const getSingleStudentAnalytics = async (req, res) => {
-    // FIX: Removed the "Aarav" fallback. 
     const { studentId, studentName, subject = "all", userInfo } = req.body;
     
+    // FIX: Extract teacherId from userInfo so the query can be scoped to the logged-in teacher
+    const teacherId = userInfo?.id || 3;
+    
     try {
-        // Guard against the UI failing to send student identifiers
         if (!studentId && !studentName) {
             return res.json({ 
                 analysis: "• Overall Performance: No academic data found for this student.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
@@ -453,26 +454,28 @@ export const getSingleStudentAnalytics = async (req, res) => {
             });
         }
 
+        // FIX: Added `a.teacher_id = $1` to match the UI Reports tab scope
         let query = `
             SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
             FROM sgs_assessment_results ar
             JOIN sgs_assessments a ON ar.assessment_id = a.assessment_id
             JOIN sgs_student_master s ON ar.student_id = s.student_id
-            WHERE 
+            WHERE a.teacher_id = $1
         `;
         
-        let params = [];
+        let params = [teacherId];
         
+        // Use dynamic index injection `$${params.length + 1}` to prevent parameter mismatch
         if (studentId) {
-            query += `s.student_id = $1`;
+            query += ` AND s.student_id = $${params.length + 1}`;
             params.push(studentId);
         } else {
-            query += `s.full_name ILIKE $1`;
+            query += ` AND s.full_name ILIKE $${params.length + 1}`;
             params.push(`%${studentName}%`);
         }
 
         if (subject && subject !== "all") {
-            query += ` AND a.subject ILIKE $2`;
+            query += ` AND a.subject ILIKE $${params.length + 1}`;
             params.push(`%${subject}%`);
         }
 
@@ -480,10 +483,9 @@ export const getSingleStudentAnalytics = async (req, res) => {
         const dbResult = await pool.query(query, params);
         const studentData = dbResult.rows;
 
-        // Bypasses the AI if no actual test records exist
         if (studentData.length === 0) {
             return res.json({ 
-                analysis: "• Overall Performance: No academic data found for this student.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
+                analysis: "• Overall Performance: No academic data found for this student in your assessments.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
                 chartData: [] 
             });
         }
@@ -515,7 +517,6 @@ No $ symbols.
         
         await logAIUsage(userInfo, "Teacher Dashboard", `Student Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
-        // If you have a cleanAIText utility like in the headmaster code, you can wrap aiResult.text here
         res.json({ analysis: aiResult.text, chartData: studentData });
     } catch (err) {
         console.error("🚨 STUDENT ANALYTICS CRASH:", err);
@@ -541,7 +542,7 @@ export const getClassAnalytics = async (req, res) => {
         let params = [teacherId];
 
         if (subject && subject !== "all") {
-            query += ` AND a.subject ILIKE $2`;
+            query += ` AND a.subject ILIKE $${params.length + 1}`;
             params.push(`%${subject}%`);
         }
 
@@ -551,7 +552,7 @@ export const getClassAnalytics = async (req, res) => {
 
         if (classData.length === 0) {
             return res.json({ 
-                analysis: "• Overall class performance: No academic data found for this class.\n• Strong performers: Cannot be determined.\n• Students needing attention: Cannot be determined.\n• Teaching recommendation: Conduct and grade an assessment to establish a performance baseline.", 
+                analysis: "• Overall class performance: No academic data found for this class in your assessments.\n• Strong performers: Cannot be determined.\n• Students needing attention: Cannot be determined.\n• Teaching recommendation: Conduct and grade an assessment to establish a performance baseline.", 
                 chartData: [] 
             });
         }
