@@ -538,9 +538,14 @@ export const getClassAnalytics = async (req, res) => {
         query += ` GROUP BY s.full_name ORDER BY overall_score DESC;`;
         const dbResult = await pool.query(query, params);
 
-        let classData = dbResult.rows;
+        const classData = dbResult.rows;
+
+        // FIX: Return a static message immediately if no data exists, bypassing the AI
         if (classData.length === 0) {
-            classData = [{ student: "No Data", overall_score: 0 }];
+            return res.json({ 
+                analysis: "• Overall class performance: No academic data found for this class.\n• Strong performers: Cannot be determined.\n• Students needing attention: Cannot be determined.\n• Teaching recommendation: Conduct and grade an assessment to establish a performance baseline.", 
+                chartData: [] 
+            });
         }
 
         const prompt = `
@@ -567,7 +572,6 @@ No $.
         
         await logAIUsage(userInfo, "Teacher Dashboard", `Class Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
-        // FIX: Match the response keys used in getSingleStudentAnalytics
         res.json({ analysis: aiResult.text, chartData: classData });
     } catch (err) {
         console.error("🚨 CLASS ANALYTICS CRASH:", err);
