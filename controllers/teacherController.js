@@ -176,15 +176,15 @@ export const generateQuestionPaper = async (req, res) => {
         
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // Conditional logic to enforce the specific question type if one is requested
-        const isSpecificType = questionType && questionType.toLowerCase() !== 'all';
+        // FIX: Strictly enforce the requested questionType from the UI
+        const isSpecificType = questionType && questionType !== 'All';
         const typeInstruction = isSpecificType 
-            ? `Generate ONLY questions of type: "${questionType}". The entire paper MUST consist exclusively of this question type. Do not divide the paper into sections.`
+            ? `CRITICAL: Generate ONLY "${questionType}" questions. The entire paper MUST consist exclusively of ${questionType} questions. Do NOT generate any other sections.`
             : `Generate a balanced mix of objective, short answer, and long answer questions.`;
 
         const prompt = `
 You are an expert school exam paper setter.
-Create a highly accurate, classroom-ready Question Paper and Answer Key based STRICTLY on the provided textbook content.
+Create a highly accurate Question Paper based STRICTLY on the provided textbook content.
 
 EXAM PARAMETERS:
 Chapter: "${chapter_name}"
@@ -199,21 +199,21 @@ TEXTBOOK CONTENT TO USE:
 ${full_text_content}
 """
 
-CRITICAL INSTRUCTIONS:
+INSTRUCTIONS:
 1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
 2. Base all questions strictly on the provided text. Do not invent facts.
 3. Complexity MUST match the ${validatedDifficulty} level.
 4. ${typeInstruction}
-5. You MUST return STRICTLY a JSON array of objects. Do not use markdown formatting outside the JSON block. Do not include plain text headers.
+5. You MUST return STRICTLY a JSON array of objects. Do not include plain text headers, greetings, or markdown outside the JSON block.
 
 Ensure the output EXACTLY matches this schema:
 [
   {
     "question": "The question text",
-    "options": ["Option A", "Option B", "Option C", "Option D"], // Provide an array of strings for MCQs, otherwise set to null
+    "type": "${isSpecificType ? questionType : 'String (e.g., MCQ, Short Answer, Long Answer)'}",
+    "options": ["Option A", "Option B", "Option C", "Option D"], // Provide array of strings for MCQs, otherwise null
     "answer": "The correct answer and any marking scheme/explanation",
-    "marks": Number, // e.g., 1, 2, 3, 4, 5
-    "type": "${isSpecificType ? questionType : 'String (e.g., MCQ, Short Answer, Long Answer)'}"
+    "marks": Number // e.g., 1, 2, 3, 4, 5
   }
 ]
 `;
@@ -223,7 +223,7 @@ Ensure the output EXACTLY matches this schema:
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard - Auto Test", 
-            `Generate AP CBSE Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
+            `Generate Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
@@ -237,7 +237,8 @@ Ensure the output EXACTLY matches this schema:
 
         const structuredQuestions = JSON.parse(jsonMatch[0]);
 
-        res.json({ questionPaper: structuredQuestions });
+        // FIX: Return the exact object key the frontend expects for rendering
+        res.json({ questions: structuredQuestions });
 
     } catch (err) {
         console.error("🚨 QUESTION PAPER CRASH:", err);
@@ -440,9 +441,18 @@ Formatting Rules
 // 7. STUDENT ANALYTICS
 // ==========================================
 export const getSingleStudentAnalytics = async (req, res) => {
-    const { studentId, studentName = "Aarav", subject = "all", userInfo } = req.body;
+    // FIX: Removed the "Aarav" fallback. 
+    const { studentId, studentName, subject = "all", userInfo } = req.body;
     
     try {
+        // Guard against the UI failing to send student identifiers
+        if (!studentId && !studentName) {
+            return res.json({ 
+                analysis: "• Overall Performance: No academic data found for this student.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
+                chartData: [] 
+            });
+        }
+
         let query = `
             SELECT a.title AS test_name, a.assessment_type AS type, ar.percentage AS score
             FROM sgs_assessment_results ar
@@ -470,7 +480,7 @@ export const getSingleStudentAnalytics = async (req, res) => {
         const dbResult = await pool.query(query, params);
         const studentData = dbResult.rows;
 
-        // FIX: Return a static message immediately if no data exists, bypassing the AI
+        // Bypasses the AI if no actual test records exist
         if (studentData.length === 0) {
             return res.json({ 
                 analysis: "• Overall Performance: No academic data found for this student.\n• Strengths: Cannot be determined.\n• Weaknesses: Cannot be determined.\n• One Recommendation: Conduct and grade an assessment to establish a performance baseline.", 
@@ -482,7 +492,7 @@ export const getSingleStudentAnalytics = async (req, res) => {
 You are helping a teacher analyse student performance.
 
 Student Name
-${studentName}
+${studentName || 'the student'}
 
 Performance Data
 ${JSON.stringify(studentData)}
@@ -505,6 +515,7 @@ No $ symbols.
         
         await logAIUsage(userInfo, "Teacher Dashboard", `Student Analytics (${subject})`, aiResult.usageMetadata || aiResult.response?.usageMetadata);
 
+        // If you have a cleanAIText utility like in the headmaster code, you can wrap aiResult.text here
         res.json({ analysis: aiResult.text, chartData: studentData });
     } catch (err) {
         console.error("🚨 STUDENT ANALYTICS CRASH:", err);
@@ -529,7 +540,6 @@ export const getClassAnalytics = async (req, res) => {
         `;
         let params = [teacherId];
 
-        // Guard against empty strings and query the correct 'subject' column
         if (subject && subject !== "all") {
             query += ` AND a.subject ILIKE $2`;
             params.push(`%${subject}%`);
@@ -537,10 +547,8 @@ export const getClassAnalytics = async (req, res) => {
 
         query += ` GROUP BY s.full_name ORDER BY overall_score DESC;`;
         const dbResult = await pool.query(query, params);
-
         const classData = dbResult.rows;
 
-        // FIX: Return a static message immediately if no data exists, bypassing the AI
         if (classData.length === 0) {
             return res.json({ 
                 analysis: "• Overall class performance: No academic data found for this class.\n• Strong performers: Cannot be determined.\n• Students needing attention: Cannot be determined.\n• Teaching recommendation: Conduct and grade an assessment to establish a performance baseline.", 
@@ -578,7 +586,6 @@ No $.
         res.status(500).json({ error: "Failed to generate class analytics.", details: err.message });
     }
 };
-
 
 // ==========================================
 // 9 & 10. LANGUAGE TRANSLATOR 
