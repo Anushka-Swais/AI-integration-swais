@@ -24,33 +24,22 @@ const googleVoiceMap = {
 };
 
 // ==========================================
-// 1. AUTO LESSON PLANNER (GODAVARI DEVI SARAF FORMAT)
+// 1. AUTO LESSON PLANNER (DAY-WISE JSON)
 // ==========================================
 export const generateLessonPlan = async (req, res) => {
     const { 
         chapterId, 
         durationMinutes = 45, 
         userInfo,
-        classLevel = 'Not specified',
-        section = 'Not specified',
-        subject = 'Not specified',
         topic,
-        designation = 'Teacher',
-        noOfPeriods = 'Not specified',
-        dateOfCommencement = 'Not specified',
-        expectedCompletion = 'Not specified',
-        actualCompletion = 'Not specified'
+        noOfPeriods = 5 // Defaulting to 5 days if not provided
     } = req.body;
-    
+
     const teacherId = userInfo?.id || 3;
-    const teacherName = userInfo?.name || 'Not specified';
 
     if (!chapterId) return res.status(400).json({ error: "Chapter ID is required" });
 
     try {
-        const schoolResult = await pool.query('SELECT school_name FROM sgs_school_name LIMIT 1');
-        const school_name = schoolResult.rows[0]?.school_name || '';
-
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
@@ -60,72 +49,60 @@ export const generateLessonPlan = async (req, res) => {
         const { chapter_name, full_text_content } = result.rows[0];
         const finalTopic = topic && topic.trim() !== '' ? topic : chapter_name;
 
+        // NEW PROMPT: Forces day-wise JSON and completely removes the Header generation to fix the August bugs.
         const prompt = `
-You are an expert, highly experienced school teacher. Your task is to write a comprehensive and deeply detailed lesson plan for the topic "${finalTopic}".
-You MUST base your entire lesson plan STRICTLY on the following textbook content:
+You are an expert school teacher. Create a day-wise lesson plan for the chapter "${finalTopic}".
+You have exactly ${noOfPeriods} days (periods) to complete this chapter.
+
+TEXTBOOK CONTENT:
 """
 ${full_text_content}
 """
 
 CRITICAL INSTRUCTIONS:
-1. Act like a real teacher planning a detailed, practical lesson. NO generic filler. Write exact teaching strategies, specific real-world examples, and precise questions you will ask.
-2. Format the output EXACTLY matching the structure below. Do not add any extra headings, JSON, or markdown code blocks.
-3. Fill in the bracketed areas with deep, faculty-level detail.
+1. Divide the chapter content logically across exactly ${noOfPeriods} days.
+2. Focus ONLY on the textbook content provided. Do not invent unrelated topics.
+3. You MUST return ONLY a valid JSON object matching the exact structure below. Do not include markdown blocks or plain text.
 
-${school_name} 
-LESSON PLAN
-
-Name of the teacher: ${teacherName}
-Designation: ${designation}
-Class & Section: ${classLevel} ${section}
-Subject: ${subject}
-Chapter: ${finalTopic}
-No. Of Periods: ${noOfPeriods}
-Date of Commencement: ${dateOfCommencement}
-Expected date of completion: ${expectedCompletion}
-Actual date of completion: ${actualCompletion}
-
-Learning objectives:
-[Write 3-4 specific, measurable objectives using action verbs. E.g., "Students will be able to calculate...", "Students will identify..."]
-
-Learning outcomes:
-[Write 3-4 specific outcomes detailing exactly what students will demonstrate by the end of the lesson.]
-
-Methodology:
-[Provide a detailed, step-by-step teaching method. E.g., "1. Hook: Start by showing... 2. Direct Instruction: Explain the concept using [specific analogy]. 3. Guided Practice: Solve problem X together..."]
-
-TLM:
-[List specific Teaching Learning Materials. E.g., "Textbook page X, Smartboard presentation on Y, physical props like Z"]
-
-Activities:
-[Detail 1-2 specific classroom activities. E.g., "Think-Pair-Share: Students will pair up to solve...", or "Group Activity: Groups of 4 will analyze..."]
-
-Assessment:
-[List 2-3 exact questions you will ask to check understanding, or describe a specific exit ticket task.]
-
-Home Work:
-[Give a specific, actionable homework assignment related to the exact text provided.]
-
-Sign. of the Teacher                                          Sign. of the Dean.
+REQUIRED JSON STRUCTURE:
+{
+  "chapter": "${finalTopic}",
+  "total_days": ${noOfPeriods},
+  "days": [
+    {
+      "day_no": 1,
+      "objectives": "Specific, measurable objective for this day",
+      "activities": "Specific classroom activity",
+      "tlm": "Required teaching learning materials",
+      "homework": "Specific homework assignment"
+    }
+  ]
+}
 `;
 
         const aiResult = await model.generateContent(prompt);
-        const lessonPlanText = aiResult.text;
+        
+        // Clean markdown backticks and parse JSON
+        let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        
+        if (!jsonMatch) throw new Error("Failed to parse AI output into valid JSON.");
+        const structuredPlan = JSON.parse(jsonMatch[0]);
 
         await logAIUsage(
             userInfo, 
             "Teacher Dashboard", 
-            "Generate Lesson Plan", 
+            "Generate Day-wise Lesson Plan", 
             aiResult.usageMetadata || aiResult.response?.usageMetadata
         );
 
         await pool.query(
             `INSERT INTO sgs_lesson_plans (teacher_id, title, chapter_id, chapter_text, duration_minutes, created_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-            [teacherId, `AI Plan: ${finalTopic}`, chapterId, chapter_name, durationMinutes]
+            [teacherId, `Day-wise Plan: ${finalTopic}`, chapterId, chapter_name, durationMinutes]
         );
 
-        res.json({ lessonPlan: lessonPlanText });
+        res.json({ lessonPlan: structuredPlan });
     } catch (err) {
         console.error("🚨 LESSON PLAN CRASH:", err);
         res.status(500).json({ error: "Failed to generate lesson plan.", details: err.message });
@@ -133,14 +110,15 @@ Sign. of the Teacher                                          Sign. of the Dean.
 };
 
 // ==========================================
-// 2. AUTO QUESTION PAPER GENERATOR (CBSE AP BLUEPRINT)
+// 2. AUTO QUESTION PAPER GENERATOR (CONSTRAINED & TIERED)
 // ==========================================
 export const generateQuestionPaper = async (req, res) => {
     try {
         const body = req.body || {};
         const { 
             chapterId, 
-            difficulty = 'Medium', 
+            difficulty = 'Core', // Updated default to MurthyP's terminology
+            taughtTopics = [], // NEW: Array of topics actually taught
             questionType = 'All', 
             totalMarks = 50,
             classLevel = 'Class 8', 
@@ -152,34 +130,26 @@ export const generateQuestionPaper = async (req, res) => {
             return res.status(400).json({ error: "Please select a valid Class, Subject, and Chapter before generating." });
         }
 
-        const validMarks = [10, 20, 30, 50, 70, 80, 100];
-        if (!validMarks.includes(parseInt(totalMarks))) {
-            return res.status(400).json({ error: "Total marks must be valid." });
-        }
-
-        const validDifficulties = ['Easy', 'Medium', 'Hard'];
-        const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Medium';
-
-        const teacherId = userInfo?.id || 3; 
-
-        const schoolResult = await pool.query('SELECT school_name FROM sgs_school_name LIMIT 1');
-        const school_name = schoolResult.rows[0]?.school_name || '';
+        // Updated Difficulty Validation
+        const validDifficulties = ['Foundational', 'Core', 'Advanced'];
+        const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'Core';
 
         const result = await pool.query(
             'SELECT chapter_name, full_text_content FROM sgs_chapter_content WHERE chapter_id = $1', 
             [chapterId]
         );
         
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Chapter not found in database" });
-        }
-        
+        if (result.rows.length === 0) return res.status(404).json({ error: "Chapter not found in database" });
         const { chapter_name, full_text_content } = result.rows[0];
 
-        // FIX: Strictly enforce the requested questionType from the UI
+        // NEW: Enforce topic constraints
+        const topicInstruction = taughtTopics && taughtTopics.length > 0 
+            ? `CRITICAL: You MUST ONLY generate questions from the following taught topics: ${taughtTopics.join(', ')}. DO NOT generate questions from any other part of the chapter.`
+            : `Generate questions from the provided textbook content.`;
+
         const isSpecificType = questionType && questionType !== 'All';
         const typeInstruction = isSpecificType 
-            ? `CRITICAL: Generate ONLY "${questionType}" questions. The entire paper MUST consist exclusively of ${questionType} questions. Do NOT generate any other sections.`
+            ? `CRITICAL: Generate ONLY "${questionType}" questions. The entire paper MUST consist exclusively of ${questionType} questions.`
             : `Generate a balanced mix of objective, short answer, and long answer questions.`;
 
         const prompt = `
@@ -188,56 +158,40 @@ Create a highly accurate Question Paper based STRICTLY on the provided textbook 
 
 EXAM PARAMETERS:
 Chapter: "${chapter_name}"
-Class: ${classLevel}
-Subject: ${subject}
-Difficulty: ${validatedDifficulty}
+Difficulty Tier: ${validatedDifficulty} (Adjust complexity accordingly)
 Total Marks: ${totalMarks}
-Requested Format: ${questionType}
 
-TEXTBOOK CONTENT TO USE:
+TEXTBOOK CONTENT:
 """
 ${full_text_content}
 """
 
 INSTRUCTIONS:
-1. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
-2. Base all questions strictly on the provided text. Do not invent facts.
-3. Complexity MUST match the ${validatedDifficulty} level.
-4. ${typeInstruction}
-5. You MUST return STRICTLY a JSON array of objects. Do not include plain text headers, greetings, or markdown outside the JSON block.
+1. ${topicInstruction}
+2. The sum of the marks for all questions MUST add up exactly to ${totalMarks}.
+3. ${typeInstruction}
+4. You MUST return STRICTLY a JSON array of objects. Do not include markdown outside the JSON block.
 
 Ensure the output EXACTLY matches this schema:
 [
   {
     "question": "The question text",
-    "type": "${isSpecificType ? questionType : 'String (e.g., MCQ, Short Answer, Long Answer)'}",
+    "type": "${isSpecificType ? questionType : 'String (e.g., MCQ, Short Answer)'}",
     "options": ["Option A", "Option B", "Option C", "Option D"], // Provide array of strings for MCQs, otherwise null
-    "answer": "The correct answer and any marking scheme/explanation",
-    "marks": Number // e.g., 1, 2, 3, 4, 5
+    "answer": "The correct answer and marking scheme",
+    "marks": Number
   }
 ]
 `;
 
         const aiResult = await model.generateContent(prompt);
         
-        await logAIUsage(
-            userInfo, 
-            "Teacher Dashboard - Auto Test", 
-            `Generate Question Paper (${validatedDifficulty} - ${totalMarks} Marks)`, 
-            aiResult.usageMetadata || aiResult.response?.usageMetadata
-        );
-
-        // Strip markdown backticks and extract JSON array
         let cleanedText = aiResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
         
-        if (!jsonMatch) {
-            throw new Error("Failed to parse AI output into valid JSON array structure.");
-        }
-
+        if (!jsonMatch) throw new Error("Failed to parse AI output into valid JSON array structure.");
         const structuredQuestions = JSON.parse(jsonMatch[0]);
 
-        // FIX: Return the exact object key the frontend expects for rendering
         res.json({ questions: structuredQuestions });
 
     } catch (err) {
