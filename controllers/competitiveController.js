@@ -1,13 +1,38 @@
 import { logAIUsage } from '../utils/aiTracker.js';
 import model from '../config/aiConfig.js';
-// import Exam from '../models/Exam.js'; 
 
 // ==========================================
-// 13. COMPETITIVE EXAM PREP MODULE (Time-Scheduled)
+// 🌍 EXAM BLUEPRINT CONFIGURATION DICTIONARY
+// ==========================================
+// Define specific rules per class and per exam type here.
+const examBlueprints = {
+    "6": {
+        "IIT": "Class 6 IIT Track: Focus on foundational algebra, logical reasoning, and basic physics mechanics. +4 Marks, -1 Negative Marking.",
+        "NEET": "Class 6 NEET Track: Focus on introductory biology, life sciences, and basic chemistry. +4 Marks, -1 Negative Marking.",
+        "CEAM": "Class 6 CEAM Programme: Standardized general competitive foundation. +4 Marks, -1 Negative Marking."
+    },
+    "7": {
+        "IIT": "Class 7 IIT Track: Focus on quadratic equations, ratios, and conceptual physics. +4 Marks, -1 Negative Marking.",
+        "NEET": "Class 7 NEET Track: Focus on detailed plant/animal biology and chemical properties. +4 Marks, -1 Negative Marking.",
+        "CEAM": "Class 7 CEAM Programme: Intermediate competitive foundation."
+    },
+    "8": {
+        "IIT": "Class 8 IIT Track: Rigorous problem-solving in Math (relations, equations) and Physics (force/energy). +4 Marks, -1 Negative Marking.",
+        "NEET": "Class 8 NEET Track: In-depth Biology and introductory organic Chemistry. +4 Marks, -1 Negative Marking."
+    },
+    "9": {
+        "IIT": "Class 9 Cream Specialized IIT Track: Heavy execution testing in JEE models (coordinate geometry, advanced physics). +4 Marks, -1 Negative Marking.",
+        "NEET": "Class 9 Cream Specialized NEET Track: Advanced pre-medical foundation (meristems, taxonomy). +4 Marks, -1 Negative Marking.",
+        "CEAM": "Class 9 CEAM Programme: State-level talent search prep."
+    }
+};
+
+// ==========================================
+// 13. COMPETITIVE EXAM PREP MODULE
 // ==========================================
 export const generateCompetitiveContent = async (req, res) => {
     const { 
-        examTarget, 
+        examTarget, // e.g., "IIT", "NEET", "CEAM"
         subject, 
         topic, 
         classLevel, 
@@ -15,8 +40,8 @@ export const generateCompetitiveContent = async (req, res) => {
         userInfo, 
         totalMarks, 
         examDifficulty = 'Medium',
-        scheduledStartTime, // e.g., "2026-09-01T10:00:00Z"
-        scheduledEndTime    // e.g., "2026-09-01T13:00:00Z"
+        scheduledStartTime, 
+        scheduledEndTime  
     } = req.body;
     
     if (!examTarget || !subject || !contentType || !classLevel) {
@@ -37,23 +62,25 @@ export const generateCompetitiveContent = async (req, res) => {
         let prompt = "";
         let isJsonExpected = false;
         
-        let trackInfo = "";
-        const classNum = parseInt(classLevel.replace(/\D/g, '')) || 8; 
-
-        if (classNum >= 1 && classNum <= 5) {
+        // 1. Extract the numeric class value (e.g., "Class 6" -> "6")
+        const classNumStr = classLevel.replace(/\D/g, '') || "8"; 
+        const classNum = parseInt(classNumStr);
+        
+        // 2. Look up the specific blueprint from the dictionary
+        // Fallback to a generic string if the specific Class + Exam combo isn't mapped yet
+        let trackInfo = "Standard Competitive Track: +4 Marks, -1 Negative Marking.";
+        if (examBlueprints[classNumStr] && examBlueprints[classNumStr][examTarget]) {
+            trackInfo = examBlueprints[classNumStr][examTarget];
+        } else if (classNum >= 1 && classNum <= 5) {
             trackInfo = "Spark Junior Track: +2 Marks, NO Negative Marking.";
-        } else if (classNum >= 6 && classNum <= 8) {
-            trackInfo = "Pre-Foundation Spark / CEAM: +4 Marks, -1 Negative Marking.";
-        } else if (classNum >= 9 && classNum <= 10) {
-            trackInfo = "Cream Specialized Track: Heavy execution testing. +4 Marks, -1 Negative Marking.";
         } else if (classNum >= 11 && classNum <= 12) {
             trackInfo = "Target Elite Track: Strict national patterns (+4/-1).";
         }
 
         const classGuardrail = `
-🚨 CRITICAL AGE, SYLLABUS & AP CBSE BLUEPRINT CONSTRAINT 🚨
+🚨 CRITICAL AGE, SYLLABUS & BLUEPRINT CONSTRAINT 🚨
 Target Exam: ${examTarget}
-Student Class: ${classLevel} (Approx age: ${classNum + 5} years old)
+Student Class: ${classLevel} (Approx age:${classNum + 5} years old)
 Institutional Track Guidelines: ${trackInfo}
 
 You MUST ONLY use concepts strictly appropriate for a Class ${classLevel} syllabus, adhering to the SGS Eduhunt micro-schedules. 
